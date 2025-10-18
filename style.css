@@ -1,0 +1,181 @@
+/* Variables de Design Dark/Imposant */
+:root {
+    --bg-dark: #000000;
+    --text-light: #ffffff;
+    --accent-color: #00FFFF; /* Cyan éclatant pour l'accentuation */
+    --input-bg: #1c1c1e; /* Gris très sombre pour les inputs */
+    --chat-bg: #0a0a0a;
+}
+
+body {
+    background-color: var(--bg-dark);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--text-light);
+    /* MODIFICATION : RETRAIT DE overflow: hidden; */
+    overflow-x: hidden; /* Empêche le scroll horizontal indésirable */
+}
+
+/* ----------------- Structure Pleine Page Immersive ----------------- */
+.full-screen-container {
+    /* MODIFICATION : min-height au lieu de height */
+    min-height: 100vh; 
+    width: 100vw;
+    position: relative;
+}
+
+.page-content {
+    /* Maintenez ces règles pour les transitions des pages */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+}
+
+#home-page {
+    /* Fond dégradé subtil pour l'accueil */
+    background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1a1a 100%);
+    z-index: 10;
+    position: relative; /* AJOUT : Pour que la page d'accueil puisse s'étendre et être scrollable */
+    min-height: 100vh; /* S'assure qu'elle occupe au moins tout l'écran */
+}
+.max-width-p {
+    max-width: 600px;
+}
+.text-accent {
+    color: var(--accent-color) !important;
+}
+
+/* ----------------- Style d'Accueil (pour l'effet "Imposant") ----------------- */
+.custom-btn {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: var(--bg-dark) !important;
+    font-weight: bold;
+    letter-spacing: 1px;
+    padding: 15px 30px;
+    transition: background-color 0.3s, transform 0.1s;
+}
+.custom-btn:hover {
+    background-color: var(--text-light);
+    border-color: var(--text-light);
+    transform: translateY(-2px);
+}
+.rule-box {
+    border-left: 5px solid var(--accent-color);
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+
+/* ----------------- Style du Chatbot ----------------- */
+#chat-page {
+    background-color: var(--chat-bg);
+    /* Maintenu à position: absolute; et height: 100%; pour garder l'effet plein écran du chat */
+}
+.chat-main-block {
+    height: 100%;
+    width: 100%;
+}
+.chat-messages {
+    overflow-y: auto;
+    background-color: var(--chat-bg);
+}
+
+.custom-input {
+    background-color: var(--input-bg) !important;
+    border: 1px solid #333 !important;
+    color: var(--text-light) !important;
+}
+.custom-input::placeholder {
+    color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.custom-btn-send {
+    background-color: var(--accent-color) !important;
+    border-color: var(--accent-color) !important;
+    color: var(--bg-dark) !important;
+}
+.custom-btn-send:hover {
+    background-color: var(--text-light) !important;
+    border-color: var(--text-light) !important;
+}
+
+/* Styles des messages */
+.message {
+    padding: 12px 18px;
+    border-radius: 25px;
+    margin-bottom: 15px;
+    max-width: 75%;
+    font-size: 1rem;
+    line-height: 1.4;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
+.bot-message {
+    background-color: #333333; /* Gris foncé */
+    color: var(--text-light);
+    align-self: flex-start;
+    margin-right: auto;
+    border-top-left-radius: 5px;
+}
+
+.user-message {
+    background-color: var(--accent-color);
+    color: var(--bg-dark);
+    align-self: flex-end;
+    margin-left: auto;
+    border-top-right-radius: 5px;
+    font-weight: 600;
+}
+
+/* Carte de résultat - Visuellement forte */
+.result-card {
+    border: 1px solid var(--accent-color);
+    border-left: 5px solid var(--accent-color);
+    padding: 15px;
+    margin-top: 10px;
+    border-radius: 8px;
+    background-color: #1a1a1a;
+    transition: transform 0.2s;
+}
+.result-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
+}
+
+.contact-link {
+    display: inline-block;
+    margin-top: 10px;
+    font-weight: bold;
+    color: var(--accent-color);
+    text-decoration: none;
+    transition: color 0.3s;
+}
+.contact-link:hover {
+    color: var(--text-light);
+}
+
+/* ----------------- Animations (Effets Imposants) ----------------- */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes slideIn {
+    from { transform: translateX(-50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.animated-fade-in {
+    animation: fadeIn 1.5s ease-out;
+}
+.animated-slide-in {
+    animation: slideIn 1s ease-out;
+}
+.animated-fade-in-slow {
+    animation: fadeIn 2.5s ease-out;
+}
+.animated-message {
+    animation: fadeIn 0.5s ease-out;
+}
