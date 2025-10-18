@@ -1,7 +1,7 @@
 // =====================================================================
 // ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
 // =====================================================================
-const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/[VOTRE_ID_DU_SHEET]/gviz/tq?tqx=out:json'; 
+const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
 // =====================================================================
 
 let proData = []; 
@@ -357,3 +357,4 @@ function displayResults(results, activite, ville, quartier) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
+
