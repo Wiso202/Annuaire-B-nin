@@ -476,3 +476,4 @@ function searchProfessionals(activite, ville, autresMots) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
+
