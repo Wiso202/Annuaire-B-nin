@@ -3,53 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI ProFinder - Assistant Immersif</title>
+    <title>AI ProFinder - Assistant Immersif | Moderne</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <header class="app-header">
+        <div class="header-logo">
+            <i class="bi bi-robot me-2"></i> ProFinder
+        </div>
+    </header>
+
     <div id="app-container" class="full-screen-container">
         
-        <div id="home-page" class="page-content d-flex flex-column justify-content-center align-items-center p-5">
-            <div class="intro-content w-100 row g-4">
+        <div id="home-page" class="page-content d-flex flex-column justify-content-start align-items-center p-0">
+            <div class="intro-content w-100 row g-5">
                 
                 <div class="col-lg-7 d-flex flex-column justify-content-center">
-                    <h1 class="display-1 fw-bold text-white animated-fade-in">AI ProFinder.</h1>
-                    <h2 class="display-4 text-accent mb-2 animated-slide-in">L'Intelligence au service de l'annuaire.</h2>
-                    <p class="lead text-light opacity-90 mb-4 animated-fade-in-slow">
-                        Notre système d'IA filtre instantanément des milliers de professionnels vérifiés par **Ville, Activité et Spécialité**. **La connexion est immédiate.**
+                    <h1 class="display-2 fw-bold text-white animated-fade-in">L'Annuaire qui Pense.</h1>
+                    <h2 class="display-4 text-accent mb-4 animated-slide-in">AI ProFinder. Intelligence au service du Pro.</h2>
+                    <p class="lead text-secondary-text opacity-90 mb-5 animated-fade-in-slow">
+                        Trouvez le professionnel idéal en quelques secondes. Notre IA ne se contente pas de chercher, elle analyse la qualité, la proximité et la confiance.
                     </p>
 
-                    <div class="conversation-simulation-lg my-4 p-3 animated-fade-in-slow">
-                        <div class="sim-message bot-message-sim mb-2">"Bonjour, je cherche un **électricien** pour une panne à **Cotonou**."</div>
-                        <div class="sim-message user-message-sim mb-2 ms-auto">"Résultat : 3 Pros disponibles à Fidjrossè."</div>
-                        <div class="sim-message bot-message-sim small mt-3 opacity-75">"Prêt à commencer la recherche ?"</div>
+                    <div class="col-12 mt-4">
+                        <button id="start-chat-btn" class="btn btn-primary btn-lg custom-btn shadow-lg animated-fade-in w-100">
+                            <i class="bi bi-arrow-right-circle-fill me-2"></i> **COMMENCER L'ASSISTANT MAINTENANT**
+                        </button>
                     </div>
 
-                    <div class="rule-box my-4 p-3 animated-fade-in-slow w-100">
-                        <p class="mb-1 text-white fw-bold"><i class="bi bi-robot me-2 text-accent"></i> MODE D'EMPLOI :</p>
-                        <small class="text-light opacity-50">Posez des questions directes : **[Activité] à [Ville]**.<br>Exemple : **"Je cherche un maçon à Parakou"**.</small>
+                    <div class="rule-box my-5 p-3 animated-fade-in-slow w-100">
+                        <p class="mb-1 text-white fw-bold"><i class="bi bi-robot me-2 text-accent"></i> MODE D'EMPLOI RAPIDE :</p>
+                        <small class="text-light opacity-50">Posez des questions directes : **[Problème] à [Ville]**.<br>Exemple : **"J'ai une fuite à Cotonou"**.<br>
+                        *Nouveau :* Demandez aussi des lieux d'intérêt comme : **"Où est la banque la plus proche ?"**</small>
                     </div>
                 </div>
 
                 <div class="col-lg-5 d-flex flex-column justify-content-center">
-                    <div class="stat-card p-4 bg-dark text-white rounded shadow-lg animated-fade-in-slow">
-                        <h4 class="text-accent mb-3"><i class="bi bi-bar-chart-fill me-2"></i> Performance IA</h4>
+                    <div class="stat-card p-4 rounded shadow-lg animated-fade-in-slow">
+                        <h4 class="text-accent mb-4 border-bottom pb-2 border-secondary"><i class="bi bi-bar-chart-fill me-2"></i> Performance IA</h4>
                         
-                        <div class="d-flex align-items-center mb-3">
+                        <div class="d-flex align-items-center mb-4">
                             <i class="bi bi-geo-alt-fill text-accent fs-3 me-3"></i>
                             <div>
-                                <p class="mb-0 fw-bold">Villes Supportées</p>
+                                <p class="mb-0 fw-bold text-secondary-text">Villes Supportées</p>
                                 <h3 class="display-6 fw-bold text-white count-up" data-target="77">77+</h3>
                             </div>
                         </div>
 
-                        <div class="d-flex align-items-center mb-3">
+                        <div class="d-flex align-items-center mb-4">
                             <i class="bi bi-person-workspace text-accent fs-3 me-3"></i>
                             <div>
-                                <p class="mb-0 fw-bold">Secteurs Traités</p>
+                                <p class="mb-0 fw-bold text-secondary-text">Secteurs Traités</p>
                                 <h3 class="display-6 fw-bold text-white count-up" data-target="19">19</h3>
                             </div>
                         </div>
@@ -57,26 +64,65 @@
                         <div class="d-flex align-items-center">
                             <i class="bi bi-speedometer2 text-accent fs-3 me-3"></i>
                             <div>
-                                <p class="mb-0 fw-bold">Temps de Réponse Moyen</p>
+                                <p class="mb-0 fw-bold text-secondary-text">Temps de Réponse Moyen</p>
                                 <h3 class="display-6 fw-bold text-white count-up" data-target="0.5">0.5s</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12 mt-5">
+                    <h3 class="text-white fw-bold mb-5 text-center"><i class="bi bi-stars me-2 text-accent"></i> CE QUI FAIT LA DIFFÉRENCE</h3>
+                    <div class="row g-4">
+                        
+                        <div class="col-md-3">
+                            <div class="feature-card animated-pop" data-delay="0.1s">
+                                <i class="bi bi-shuffle feature-icon"></i>
+                                <h4 class="fw-bold mt-3">Tri Intelligent</h4>
+                                <p class="small text-secondary-text opacity-75">Classement par **Proximité**, **Note** et **Expérience** pour le choix optimal.</p>
+                            </div>
+                        </div>
+
+                        <div class="col-md-3">
+                            <div class="feature-card animated-pop" data-delay="0.2s">
+                                <i class="bi bi-lightning-fill feature-icon"></i>
+                                <h4 class="fw-bold mt-3">Assistant Prédictif</h4>
+                                <p class="small text-secondary-text opacity-75">Trouvez des pros en tapant votre **problème** (`panne électrique`) ou votre besoin.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="feature-card animated-pop" data-delay="0.3s">
+                                <i class="bi bi-currency-dollar feature-icon"></i>
+                                <h4 class="fw-bold mt-3">Transparence Prix</h4>
+                                <p class="small text-secondary-text opacity-75">Affiche une **estimation de prix** (fourchette) avant même le premier contact.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="feature-card animated-pop" data-delay="0.4s">
+                                <i class="bi bi-patch-check-fill feature-icon"></i>
+                                <h4 class="fw-bold mt-3">Vérification GPS</h4>
+                                <p class="small text-secondary-text opacity-75">Badge de fiabilité confirmant l'emplacement physique du professionnel sur le terrain.</p>
                             </div>
                         </div>
 
                     </div>
                 </div>
-
-                <div class="col-12 mt-4">
-                    <button id="start-chat-btn" class="btn btn-primary btn-lg custom-btn shadow-lg animated-fade-in w-100">
-                        <i class="bi bi-arrow-right-circle-fill me-2"></i> **COMMENCER L'ASSISTANT MAINTENANT**
-                    </button>
+                
+                <div class="col-12 mt-5">
+                    <h3 class="text-white fw-bold mb-4 text-center">Voyez la Puissance en Action</h3>
+                    <div class="conversation-simulation-lg p-4 animated-fade-in-slow">
+                        <div class="sim-message bot-message-sim mb-2">"Bonjour, j'ai une **fuite d'eau** à **Godomey**."</div>
+                        <div class="sim-message user-message-sim mb-2 ms-auto">"Résultat : 🔧 **Plombier** trouvé à 200m. **Note 4.9⭐**, 15 ans d'expérience."</div>
+                        <div class="sim-message bot-message-sim small mt-3 opacity-75">"Prêt à commencer la recherche ?"</div>
+                    </div>
                 </div>
-
             </div>
         </div>
-
+        
         <div id="chat-page" class="page-content d-none flex-column p-0">
              <div class="chat-main-block d-flex flex-column">
-                
                 <div class="chat-header bg-dark p-3 shadow-sm border-bottom border-secondary d-flex justify-content-between align-items-center">
                     <h5 class="text-accent mb-0"><i class="bi bi-headset me-2"></i> ASSISTANT CONVERSATIONNEL</h5>
                     <button class="btn btn-sm btn-outline-secondary" id="accueil-btn-nav">
@@ -99,8 +145,12 @@
 
     </div>
 
+    <footer class="app-footer">
+        <p class="mb-0">© 2025 AI ProFinder. Développé et propulsé par Flexitech.</p>
+    </footer>
+
     <script>
-        // Ajout d'une petite fonction pour animer les chiffres (effet "Count Up")
+        // Fonction Count Up pour les statistiques
         function animateValue(obj, start, end, duration) {
             let startTimestamp = null;
             const step = (timestamp) => {
@@ -117,12 +167,19 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Animation des statistiques
             document.querySelectorAll('.count-up').forEach(element => {
                 const target = parseFloat(element.getAttribute('data-target'));
                 if (target !== 0.5) {
                     animateValue(element, 0, target, 2000); 
                 }
-                // Si c'est 0.5s, on peut le laisser statique ou gérer une animation différente si besoin.
+            });
+            
+            // Démarrage de l'animation des cartes
+            document.querySelectorAll('.animated-pop').forEach(element => {
+                const delay = element.getAttribute('data-delay');
+                element.style.animationDelay = delay;
+                element.style.animationPlayState = 'running';
             });
         });
     </script>
