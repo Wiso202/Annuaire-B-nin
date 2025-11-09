@@ -1,5 +1,6 @@
 // =====================================================================
 // ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
+// (N'oubliez pas d'insérer votre ID entre les crochets)
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
 // =====================================================================
@@ -18,7 +19,7 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE ET MAPPAGE POUR LIEUX D'INTÉRÊT
+// LISTES DE RÉFÉRENCE ET MAPPAGE POUR LIEUX D'INTÉRÊT (NOUVEAU)
 // =====================================================================
 const SECTOR_COLUMNS = [
     'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
@@ -30,7 +31,7 @@ const SECTOR_COLUMNS = [
     'Commerce général'
 ];
 
-// NOUVEAU : Mappage des lieux d'intérêt vers les secteurs de la base
+// Mappage des lieux d'intérêt vers les secteurs de la base
 const PLACES_OF_INTEREST = {
     'banque': 'finance / assurance',
     'assurance': 'finance / assurance',
@@ -79,7 +80,9 @@ const ALL_CITIES = [
 
 const STOP_WORDS = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'pour', 'dans', 'au', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'plus', 'proche', 'où'];
 
-// ... (fonctions showPage, addMessage, handleUserQuery, loadSheetData sont inchangées)
+// =====================================================================
+// FONCTIONS DE L'INTERFACE (showPage, addMessage, handleUserQuery)
+// =====================================================================
 
 function showPage(pageId) { 
     if (pageId === 'chat') {
@@ -117,6 +120,11 @@ userInput.addEventListener('keypress', (e) => {
     }
 });
 
+
+// =====================================================================
+// FONCTION DE CHARGEMENT DES DONNÉES (MISE À JOUR AVEC NOTE/PRIX/GPS)
+// =====================================================================
+
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
     
@@ -130,22 +138,31 @@ async function loadSheetData() {
         
         // Trouver les index des colonnes basées sur leurs libellés dans le Google Sheet
         const HEADER_MAP = {
-            'Nom_Pro': 1, 'Entreprise': 2, 'Telephone': 3, 'Quartier': 4, 'Ville': 5, 'Secteur_General': 6,
+            'Nom_Pro': headers.findIndex(h => h.includes('Nom_Pro')), 
+            'Entreprise': headers.findIndex(h => h.includes('Entreprise')), 
+            'Telephone': headers.findIndex(h => h.includes('Telephone')), 
+            'Quartier': headers.findIndex(h => h.includes('Quartier')), 
+            'Ville': headers.findIndex(h => h.includes('Ville')), 
+            'Secteur_General': headers.findIndex(h => h.includes('Secteur_General')),
             'Note': headers.findIndex(h => h === 'Note'),
             'Expérience_Ans': headers.findIndex(h => h === 'Expérience_Ans'),
             'Verifie_GPS': headers.findIndex(h => h === 'Verifie_GPS'),
             'Prix_Min': headers.findIndex(h => h === 'Prix_Min'),
             'Prix_Max': headers.findIndex(h => h === 'Prix_Max')
         };
+        // Trouver l'index de départ de la première colonne d'activité détaillée
         const ACTIVITY_START_INDEX = headers.findIndex(h => h.includes('Finance / Assurance')); 
 
         const formattedData = rows.map(row => {
             const cells = row.c;
-            if (!cells[1] || !cells[3] || !cells[5]) return null; // Filtre pour les lignes vides ou incomplètes
+            
+            // Vérification minimum pour ignorer les lignes vides
+            if (!cells[HEADER_MAP.Nom_Pro] || !cells[HEADER_MAP.Telephone] || !cells[HEADER_MAP.Ville]) return null; 
 
             let activiteDetaillee = '';
             let secteurGeneral = cells[HEADER_MAP.Secteur_General] && cells[HEADER_MAP.Secteur_General].v ? cells[HEADER_MAP.Secteur_General].v : 'Inconnu'; 
 
+            // Cherche le VRAI métier dans les colonnes d'activité
             for (let i = ACTIVITY_START_INDEX; i < ACTIVITY_START_INDEX + SECTOR_COLUMNS.length; i++) {
                 if (cells[i] && cells[i].v) {
                     activiteDetaillee = cells[i].v; 
@@ -172,8 +189,8 @@ async function loadSheetData() {
             };
         }).filter(item => item && item.activite.trim() !== ''); // Supprimer les lignes nulles ou sans activité
 
+        // Mise en minuscules pour la recherche
         proData = formattedData.map(item => {
-            // Convertir tous les champs de recherche en minuscules pour la recherche
             return {
                 ...item,
                 nom: item.nom.toLowerCase(),
@@ -194,11 +211,15 @@ async function loadSheetData() {
 }
 
 
+// =====================================================================
+// FONCTION D'AFFICHAGE DES RÉSULTATS (MISE À JOUR AVEC LES CARTES PREMIUM)
+// =====================================================================
+
 function displayResults(results, activite, ville, autresMots, typeRecherche) {
     const chatBoxElement = document.getElementById('chat-box');
     let delay = 0.0; 
 
-    // Tri par Note (la plus haute en premier), puis par Expérience
+    // Tri (Classement) par Note (la plus haute en premier), puis par Expérience
     results.sort((a, b) => {
         if (b.note !== a.note) {
             return b.note - a.note; 
@@ -227,12 +248,15 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
         const prixMax = pro.prixMax || 0;
         const verifieGPS = pro.verifieGPS.toUpperCase() === 'OUI';
         
+        // Affichage des étoiles (Note et Classement)
         const fullStars = '⭐'.repeat(Math.round(note));
         const emptyStars = '☆'.repeat(5 - Math.round(note));
         const starsHtml = `<span class="text-warning me-3" title="Note moyenne">${fullStars}${emptyStars} (${note.toFixed(1)})</span>`;
 
+        // Affichage du badge GPS (Localisation et Confiance)
         const verifieBadge = verifieGPS ? `<span class="badge-verified"><i class="bi bi-patch-check-fill"></i> VÉRIFIÉ GPS</span>` : '';
         
+        // Affichage de la fourchette de prix (Budget)
         const prixRange = (prixMin > 0 && prixMax > 0) ? 
                             `<p class="price-range mb-2">Estimation Prix : ${prixMin.toLocaleString('fr-FR')} - ${prixMax.toLocaleString('fr-FR')} FCFA</p>` : 
                             '<p class="price-range mb-2 text-secondary-text">Prix non estimé, contactez pour devis.</p>';
@@ -240,7 +264,7 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
         const nomAffichage = pro.entreprise.trim() ? `${pro.entreprise.toUpperCase()} (par ${pro.nom.toUpperCase()})` : pro.nom.toUpperCase();
         const quartierInfo = pro.quartier.trim() ? `, ${pro.quartier.toUpperCase()}` : '';
 
-
+        // Template de la carte de résultat
         const html = `
             <div class="result-card animated-result-card" style="animation-delay: ${delay}s;">
                 <p class="mb-1 text-white fw-bold">${nomAffichage} - ${pro.activite.toUpperCase()}</p>
@@ -280,6 +304,10 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
 }
 
 
+// =====================================================================
+// LOGIQUE DU CHATBOT (MISE À JOUR AVEC LA RECHERCHE DE LIEUX D'INTÉRÊT)
+// =====================================================================
+
 function normalizeKeyword(word) {
     if (word.endsWith('s') && word.length > 3) {
         word = word.slice(0, -1);
@@ -305,7 +333,7 @@ function getKeywords(query) {
     let typeRecherche = 'pro'; // 'pro' ou 'lieu'
     let motsFiltre = []; // Mots restants pour filtrage Nom/Quartier
 
-    // 1. Détection de la Ville (Priorité : elle est la plus simple à identifier)
+    // 1. Détection de la Ville (Priorité)
     for (const word of words) {
         if (ALL_CITIES.includes(word)) { 
             keywordVille = word;
@@ -333,7 +361,7 @@ function getKeywords(query) {
 
         // B. Vérifie si c'est un Lieu d'Intérêt (Banque, Hôpital, Restaurant)
         if (PLACES_OF_INTEREST[normalizedWord]) {
-            keywordActivite = PLACES_OF_INTEREST[normalizedWord]; 
+            keywordActivite = PLACES_OF_INTEREST[normalizedWord]; // Mappe 'banque' à 'finance / assurance'
             usedWords.push(word);
             typeRecherche = 'lieu';
             break;
@@ -359,8 +387,8 @@ function getKeywords(query) {
 function processBotResponse(query) {
     const lowerQuery = query.toLowerCase();
 
-    // Condition pour lancer une recherche (plus souple, inclut les lieux)
-    if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('où est') || lowerQuery.includes('la plus proche')) {
+    // Condition pour lancer une recherche (inclut les lieux et la notion de proximité)
+    if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('où est') || lowerQuery.includes('plus proche')) {
         
         let { activite, ville, autresMots, typeRecherche } = getKeywords(query);
         
@@ -430,7 +458,7 @@ function searchProfessionals(activite, ville, autresMots) {
             matchActivite = true; 
         }
         
-        // 3. FILTRE PAR AUTRES MOTS
+        // 3. FILTRE PAR AUTRES MOTS (Nom, Entreprise, Quartier)
         if (motsFiltre.length > 0) {
             matchAutres = motsFiltre.some(mot => 
                 proNom.includes(mot) || 
