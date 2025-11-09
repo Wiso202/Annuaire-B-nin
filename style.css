@@ -1,181 +1,291 @@
-/* Variables de Design Dark/Imposant */
+/* ===================================================================== */
+/* NOUVELLE PALETTE ET VARIABLES DE DESIGN (Jaune Or et Noir/Gris) */
+/* ===================================================================== */
 :root {
-    --bg-dark: #000000;
+    --bg-dark: #121212; /* Gris très foncé (Anthracite) */
     --text-light: #ffffff;
-    --accent-color: #00FFFF; /* Cyan éclatant pour l'accentuation */
-    --input-bg: #1c1c1e; /* Gris très sombre pour les inputs */
-    --chat-bg: #0a0a0a;
+    --accent-color: #FFD700; /* Jaune Or éclatant */
+    --input-bg: #2a2a2a; /* Gris sombre pour les inputs */
+    --chat-bg: #0d0d0d; /* Fond pur du chat */
+    --secondary-text: #cccccc; /* Gris clair pour les descriptions */
+    --link-color: #25D366; /* Vert WhatsApp */
 }
 
 body {
     background-color: var(--bg-dark);
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: var(--text-light);
-    /* MODIFICATION : RETRAIT DE overflow: hidden; */
-    overflow-x: hidden; /* Empêche le scroll horizontal indésirable */
+    overflow-x: hidden; 
+    overflow-y: auto; 
 }
 
-/* ----------------- Structure Pleine Page Immersive ----------------- */
+/* ----------------- Structure et Animations Globales ----------------- */
 .full-screen-container {
-    /* MODIFICATION : min-height au lieu de height */
-    min-height: 100vh; 
+    min-height: 100vh;
     width: 100vw;
     position: relative;
+    padding-top: 60px; /* Espace pour le header */
 }
 
 .page-content {
-    /* Maintenez ces règles pour les transitions des pages */
-    position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
-    height: 100%;
-    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+    min-height: calc(100vh - 60px); 
+    padding: 0;
+    transition: opacity 0.5s ease-in-out;
 }
 
 #home-page {
-    /* Fond dégradé subtil pour l'accueil */
-    background: linear-gradient(135deg, var(--bg-dark) 0%, #1a1a1a 100%);
-    z-index: 10;
-    position: relative; /* AJOUT : Pour que la page d'accueil puisse s'étendre et être scrollable */
-    min-height: 100vh; /* S'assure qu'elle occupe au moins tout l'écran */
-}
-.max-width-p {
-    max-width: 600px;
-}
-.text-accent {
-    color: var(--accent-color) !important;
+    background: linear-gradient(180deg, var(--bg-dark) 0%, #000000 100%);
 }
 
-/* ----------------- Style d'Accueil (pour l'effet "Imposant") ----------------- */
-.custom-btn {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-    color: var(--bg-dark) !important;
-    font-weight: bold;
-    letter-spacing: 1px;
-    padding: 15px 30px;
-    transition: background-color 0.3s, transform 0.1s;
+/* ----------------- Header (Entête Fixe) ----------------- */
+.app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
+    background-color: #000000; 
+    border-bottom: 1px solid #333333;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    padding: 0 30px;
 }
-.custom-btn:hover {
-    background-color: var(--text-light);
-    border-color: var(--text-light);
-    transform: translateY(-2px);
+.header-logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--accent-color);
+    letter-spacing: 1px;
+}
+
+/* ----------------- Footer (Pied de Page) ----------------- */
+.app-footer {
+    width: 100%;
+    padding: 20px 0;
+    background-color: #000000;
+    border-top: 1px solid #333333;
+    text-align: center;
+    color: var(--secondary-text);
+    font-size: 0.8rem;
+    margin-top: 50px; 
+}
+
+/* ----------------- Styles de l'Introduction et des Cartes ----------------- */
+.intro-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 50px 30px;
+}
+
+.feature-card {
+    background: var(--input-bg); 
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    padding: 30px;
+    height: 100%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.4s ease;
+}
+.feature-card:hover {
+    transform: translateY(-10px); 
+    box-shadow: 0 15px 35px rgba(255, 215, 0, 0.2), 0 0 10px var(--accent-color); 
+    border-color: var(--accent-color);
+}
+.feature-icon {
+    font-size: 3rem;
+    color: var(--accent-color);
+    animation: pulse-icon 1.5s infinite alternate;
+}
+.feature-card h4 {
+    color: var(--accent-color);
+}
+
+@keyframes pop-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulse-icon {
+    from { transform: scale(1); opacity: 0.8; }
+    to { transform: scale(1.05); opacity: 1; }
+}
+.animated-pop {
+    opacity: 0;
+    animation: pop-in 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    animation-play-state: paused;
+}
+.conversation-simulation-lg {
+    border-left: 5px solid var(--accent-color);
+    background-color: var(--chat-bg);
+    border-radius: 8px;
+}
+.sim-message {
+    padding: 8px 15px;
+    border-radius: 20px;
+    max-width: 70%;
+    font-size: 0.9rem;
+}
+.bot-message-sim {
+    background-color: #333333;
+    color: var(--text-light);
+    align-self: flex-start;
+}
+.user-message-sim {
+    background-color: var(--accent-color);
+    color: var(--bg-dark);
+    align-self: flex-end;
+    font-weight: bold;
 }
 .rule-box {
-    border-left: 5px solid var(--accent-color);
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 4px;
+    border: 1px dashed var(--secondary-text);
+    border-radius: 8px;
+    background-color: #1f1f1f;
+}
+.stat-card {
+    background-color: #000000 !important;
+    border: 2px solid var(--accent-color);
+    border-radius: 15px !important;
+}
+.custom-btn {
+    background-color: var(--accent-color) !important;
+    color: var(--bg-dark) !important;
+    border: none !important;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+.custom-btn:hover {
+    background-color: #e5c100 !important; 
+    transform: scale(1.02);
 }
 
+/* ===================================================================== */
+/* STYLES DU CHAT CONVERSATIONNEL (Digne du Nom) */
+/* ===================================================================== */
 
-/* ----------------- Style du Chatbot ----------------- */
-#chat-page {
-    background-color: var(--chat-bg);
-    /* Maintenu à position: absolute; et height: 100%; pour garder l'effet plein écran du chat */
-}
 .chat-main-block {
-    height: 100%;
-    width: 100%;
+    height: 100vh;
+    background-color: var(--chat-bg);
 }
+
+.chat-header {
+    background-color: #000000 !important;
+    border-bottom: 1px solid var(--accent-color) !important;
+}
+
 .chat-messages {
     overflow-y: auto;
     background-color: var(--chat-bg);
+    padding: 20px; /* Plus d'espace autour des messages */
 }
 
-.custom-input {
-    background-color: var(--input-bg) !important;
-    border: 1px solid #333 !important;
-    color: var(--text-light) !important;
-}
-.custom-input::placeholder {
-    color: rgba(255, 255, 255, 0.3) !important;
-}
-
-.custom-btn-send {
-    background-color: var(--accent-color) !important;
-    border-color: var(--accent-color) !important;
-    color: var(--bg-dark) !important;
-}
-.custom-btn-send:hover {
-    background-color: var(--text-light) !important;
-    border-color: var(--text-light) !important;
-}
-
-/* Styles des messages */
+/* --- Bulles de Messages --- */
 .message {
-    padding: 12px 18px;
-    border-radius: 25px;
-    margin-bottom: 15px;
-    max-width: 75%;
-    font-size: 1rem;
-    line-height: 1.4;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    max-width: 85%; /* Plus large pour le contenu des cartes */
+    margin-bottom: 18px; /* Plus d'espace entre les messages */
+    padding: 0; /* Le padding sera sur les bulles internes */
 }
 
+/* Bulle du BOT (Réponses standard) */
 .bot-message {
-    background-color: #333333; /* Gris foncé */
-    color: var(--text-light);
+    background-color: transparent; /* Pas de fond sur l'enveloppe */
     align-self: flex-start;
-    margin-right: auto;
-    border-top-left-radius: 5px;
+}
+.bot-message > p { /* Pour les messages texte simples */
+    background-color: var(--input-bg);
+    padding: 12px 18px;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
+/* Bulle de l'UTILISATEUR */
 .user-message {
     background-color: var(--accent-color);
     color: var(--bg-dark);
     align-self: flex-end;
     margin-left: auto;
-    border-top-right-radius: 5px;
+    padding: 12px 18px;
+    border-radius: 18px;
+    border-bottom-right-radius: 4px;
     font-weight: 600;
+    box-shadow: 0 2px 5px rgba(255, 215, 0, 0.3);
 }
 
-/* Carte de résultat - Visuellement forte */
-.result-card {
-    border: 1px solid var(--accent-color);
+/* --- Carte de Résultat (Remplacement de la bulle pour les pros) --- */
+@keyframes card-fade-in-up {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animated-result-card {
+    animation: card-fade-in-up 0.5s ease-out forwards;
+}
+
+.bot-message .result-card {
+    padding: 20px;
+    margin: 0;
+    max-width: 100%;
+    background-color: #1a1a1a; 
+    border-radius: 12px;
     border-left: 5px solid var(--accent-color);
-    padding: 15px;
-    margin-top: 10px;
-    border-radius: 8px;
-    background-color: #1a1a1a;
-    transition: transform 0.2s;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 .result-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0, 255, 255, 0.2);
+    transform: translateY(-5px) scale(1.01);
+    box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3); 
 }
 
-.contact-link {
-    display: inline-block;
-    margin-top: 10px;
+.price-range {
+    color: var(--secondary-text); 
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-style: italic;
+    border-top: 1px dashed #333;
+    padding-top: 8px;
+    margin-top: 8px;
+}
+.badge-verified {
+    background-color: #38761d; 
+    color: #ffffff;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75rem;
     font-weight: bold;
-    color: var(--accent-color);
-    text-decoration: none;
-    transition: color 0.3s;
+    display: inline-flex;
+    align-items: center;
+    margin-right: 10px;
+    animation: pulse-verified 2s infinite alternate; 
 }
-.contact-link:hover {
+@keyframes pulse-verified {
+    from { box-shadow: 0 0 5px rgba(56, 118, 29, 0.5); }
+    to { box-shadow: 0 0 10px var(--accent-color), 0 0 10px rgba(56, 118, 29, 0.8); }
+}
+.whatsapp-link {
+    color: var(--link-color); 
+}
+.whatsapp-link:hover {
+    color: var(--accent-color); 
+}
+
+/* --- Zone de Saisie (Footer) --- */
+.chat-footer {
+    background-color: #000000 !important;
+    border-top: 1px solid #333333 !important;
+}
+.custom-input {
+    background-color: var(--input-bg);
     color: var(--text-light);
+    border: 1px solid #444;
 }
-
-/* ----------------- Animations (Effets Imposants) ----------------- */
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+.custom-input:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 0.25rem rgba(255, 215, 0, 0.25);
 }
-@keyframes slideIn {
-    from { transform: translateX(-50px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+.custom-btn-send {
+    background-color: var(--accent-color) !important;
+    color: var(--bg-dark) !important;
+    border: none !important;
 }
-
-.animated-fade-in {
-    animation: fadeIn 1.5s ease-out;
-}
-.animated-slide-in {
-    animation: slideIn 1s ease-out;
-}
-.animated-fade-in-slow {
-    animation: fadeIn 2.5s ease-out;
-}
-.animated-message {
-    animation: fadeIn 0.5s ease-out;
+.custom-btn-send:hover {
+    background-color: #e5c100 !important;
 }
