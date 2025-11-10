@@ -1,5 +1,6 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : URL API AVEC LE GID CORRIGÉ (Ligne inchangée)
+// ⚠️ ÉTAPE 1 : CORRECTION DE L'URL API AVEC LE GID DU BON ONGLET
+// Sans le gid=968871846, le script affiche 0 pro.
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json&gid=968871846'; 
 // =====================================================================
@@ -76,7 +77,8 @@ const ALL_CITIES = [
     'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
 ].map(city => city.toLowerCase()); 
 
-const STOP_WORDS = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'pour', 'dans', 'au', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'plus', 'proche', 'où', 'quelle', 'est', 'fourchette', 'prix', 'd'];
+// MISE À JOUR : Ajout des mots liés au prix, à la proximité (faute) et autres.
+const STOP_WORDS = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'pour', 'dans', 'au', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'plus', 'proche', 'où', 'quelle', 'fourchette', 'prix', 'd', 'ce', 'ci', 'mon', 'ma', 'moi', 'mme', 'oruche', 'baque'];
 
 
 // =====================================================================
@@ -121,7 +123,7 @@ userInput.addEventListener('keypress', (e) => {
 
 
 // =====================================================================
-// FONCTION DE CHARGEMENT DES DONNÉES (inchangée)
+// FONCTION DE CHARGEMENT DES DONNÉES (mise à jour pour un mapping plus sûr)
 // =====================================================================
 
 async function loadSheetData() {
@@ -154,6 +156,7 @@ async function loadSheetData() {
         const formattedData = rows.map(row => {
             const cells = row.c;
             
+            // Vérification des index trouvés
             if (HEADER_MAP.Nom_Pro === -1 || HEADER_MAP.Telephone === -1 || HEADER_MAP.Ville === -1 || 
                 !cells[HEADER_MAP.Nom_Pro] || !cells[HEADER_MAP.Telephone] || !cells[HEADER_MAP.Ville]) return null; 
 
@@ -290,10 +293,11 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
 
 
 // =====================================================================
-// LOGIQUE DU CHATBOT (CORRECTION MAJEURE dans getKeywords et processBotResponse)
+// LOGIQUE DE DÉTECTION DES MOTS-CLÉS (CORRIGÉE)
 // =====================================================================
 
 function normalizeKeyword(word) {
+    // Suppression du pluriel
     if (word.endsWith('s') && word.length > 3) {
         word = word.slice(0, -1);
     }
@@ -305,19 +309,23 @@ function normalizeKeyword(word) {
     if (word.includes('plomb')) {
         return 'plomberie';
     }
+    // Gère le typo "baque" pour "banque" (Nouveau)
+    if (word.includes('baque')) {
+        return 'banque';
+    }
     return word;
 }
 
 
 function getKeywords(query) {
-    const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 1); // Taille minimum 2 pour la ville/activité
+    const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 1);
     let keywordActivite = null;
     let keywordVille = null;
     let usedWords = [];
     let motsFiltre = [];
     let typeRecherche = 'pro'; 
 
-    // 1. Détection de l'Activité ou du Lieu d'Intérêt (Priorité pour le sens de la requête)
+    // 1. Détection de l'Activité ou du Lieu d'Intérêt (Priorité : le cœur de la recherche)
     for (const word of words) {
         if (STOP_WORDS.includes(word)) continue;
         
@@ -373,13 +381,10 @@ function processBotResponse(query) {
     
     let { activite, ville, autresMots, typeRecherche } = getKeywords(query);
 
-    // DÉCLENCHEUR DE RECHERCHE SIMPLIFIÉ : Si une activité OU une ville est trouvée, on cherche.
+    // DÉCLENCHEUR DE RECHERCHE SIMPLIFIÉ : On cherche dès qu'un élément significatif est trouvé.
     if (activite || ville || autresMots.length > 0) {
         
-        // C'était la cause de l'échec pour 'informaticien à cotonou' si activite était null ou mal formaté.
-        if (activite === 'informaticien') activite = 'informatique'; 
-        
-        // Gestion de la requête trop vague si un mot libre est le seul critère
+        // Si la requête est trop vague (seulement un mot libre)
         if (!activite && !ville && autresMots.length > 0) {
             consecutiveBadQueries++;
             if (consecutiveBadQueries >= 2) { 
@@ -390,7 +395,6 @@ function processBotResponse(query) {
              addMessage("Veuillez être plus précis. Je dois connaître l'**Activité** ou la **Ville** en plus de ce mot-clé libre.", 'bot');
              return;
         }
-
 
         consecutiveBadQueries = 0; 
         let results = searchProfessionals(activite, ville, autresMots);
@@ -443,7 +447,7 @@ function searchProfessionals(activite, ville, autresMots) {
             matchActivite = true; 
         }
         
-        // 3. FILTRE PAR AUTRES MOTS (Nom, Entreprise, Quartier)
+        // 3. FILTRE PAR AUTRES MOTS
         if (motsFiltre.length > 0) {
             matchAutres = motsFiltre.some(mot => 
                 proNom.includes(mot) || 
@@ -454,7 +458,6 @@ function searchProfessionals(activite, ville, autresMots) {
             matchAutres = true; 
         }
         
-        // Le professionnel est inclus si TOUS les critères trouvés correspondent
         return matchActivite && matchVille && matchAutres;
     });
 }
