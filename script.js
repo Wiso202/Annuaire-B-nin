@@ -1,5 +1,6 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : URL API RÉT BLIE À VOTRE VERSION (Selon votre demande)
+// ⚠️ ÉTAPE 1 : URL API RÉT BLIE AU LIEN SANS GID (Code 1)
+// C'est l'URL qui permet de charger les données du nombre total de pros.
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
 // =====================================================================
@@ -18,7 +19,7 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE ET MAPPAGE (INCHANGÉES)
+// LISTES DE RÉFÉRENCE ET MAPPAGE POUR LA RECHERCHE
 // =====================================================================
 const SECTOR_COLUMNS = [
     'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
@@ -76,14 +77,14 @@ const ALL_CITIES = [
     'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
 ].map(city => city.toLowerCase()); 
 
-// CORRECTION MAJEURE : Liste étendue des mots à ignorer.
+// LISTE ÉTENDUE ET MISE À JOUR des mots à ignorer pour vos requêtes
 const STOP_WORDS = [
-    'cherche', 'trouve', 'besoin', 'recherche', 'me', 'pour', 'mme', 
-    'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'dans', 'au', 'du', 'des',
+    'cherche', 'trouve', 'besoin', 'recherche', 'me', 'pour', 'mme', 's',
+    'un', 'une', 'à', 'de', 'le', 'la', 'les', 'l', 'en', 'sur', 'dans', 'au', 'du', 'des',
     'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'ce', 'ci',
-    'plus', 'proche', 'où', 'quelle', 'comment', 'pourquoi', 'mon', 'ma', 'moi',
-    // Mots liés au prix
-    'fourchette', 'prix', 'combien', 'coute',
+    'plus', 'proche', 'où', 'comment', 'pourquoi', 'mon', 'ma', 'moi',
+    // Mots liés au prix qui doivent être ignorés pour trouver la profession
+    'fourchette', 'prix', 'combien', 'coute', 'quelle',
     // Fautes de frappe courantes ajoutées comme mots vides si non corrigées par normalisation
     'oruche', 'baque', 'd'
 ];
@@ -125,14 +126,14 @@ function handleUserQuery() {
 sendBtn.addEventListener('click', handleUserQuery);
 userInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        e.preventDefault(); // Empêche le saut de ligne sur Enter
+        e.preventDefault(); 
         handleUserQuery();
     }
 });
 
 
 // =====================================================================
-// FONCTION DE CHARGEMENT DES DONNÉES (inchangée, utilise votre URL)
+// FONCTION DE CHARGEMENT DES DONNÉES 
 // =====================================================================
 
 async function loadSheetData() {
@@ -141,11 +142,13 @@ async function loadSheetData() {
     try {
         const response = await fetch(SHEET_API_URL);
         const text = await response.text();
+        // Google Sheet API renvoie du JSON dans une fonction, on doit le nettoyer
         const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
         const data = JSON.parse(jsonText);
         const rows = data.table.rows;
         const headers = data.table.cols.map(col => col.label);
         
+        // Mappage des en-têtes (colonne Nom_Pro, Ville, etc.)
         const HEADER_MAP = {
             'Nom_Pro': headers.findIndex(h => h.includes('Nom_Pro')), 
             'Entreprise': headers.findIndex(h => h.includes('Entreprise')), 
@@ -164,12 +167,14 @@ async function loadSheetData() {
         const formattedData = rows.map(row => {
             const cells = row.c;
             
+            // Vérification de base pour ignorer les lignes vides ou mal formatées
             if (HEADER_MAP.Nom_Pro === -1 || HEADER_MAP.Telephone === -1 || HEADER_MAP.Ville === -1 || 
                 !cells[HEADER_MAP.Nom_Pro] || !cells[HEADER_MAP.Telephone] || !cells[HEADER_MAP.Ville]) return null; 
 
             let activiteDetaillee = '';
             let secteurGeneral = cells[HEADER_MAP.Secteur_General] && cells[HEADER_MAP.Secteur_General].v ? cells[HEADER_MAP.Secteur_General].v : 'Inconnu'; 
 
+            // Trouve l'activité détaillée dans les colonnes des secteurs (colonne non vide)
             for (let i = ACTIVITY_START_INDEX; i < ACTIVITY_START_INDEX + SECTOR_COLUMNS.length; i++) {
                 if (cells[i] && cells[i].v) {
                     activiteDetaillee = cells[i].v; 
@@ -193,6 +198,7 @@ async function loadSheetData() {
             };
         }).filter(item => item && item.activite.trim() !== '');
 
+        // Normalisation en minuscules pour la recherche
         proData = formattedData.map(item => {
             return {
                 ...item,
@@ -208,8 +214,7 @@ async function loadSheetData() {
         addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot'); 
 
     } catch (error) {
-        // Le message d'erreur est conservé pour l'utilisateur
-        addMessage("❌ Erreur de connexion aux données. Vérifiez l'URL de l'API.", 'bot');
+        addMessage("❌ Erreur de connexion aux données. Vérifiez l'URL du Google Sheet.", 'bot');
         console.error("Erreur de chargement des données :", error);
     }
 }
@@ -223,6 +228,7 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
     const chatBoxElement = document.getElementById('chat-box');
     let delay = 0.0; 
 
+    // Tri par Note/Expérience
     results.sort((a, b) => {
         if (b.note !== a.note) {
             return b.note - a.note; 
@@ -254,6 +260,7 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
 
         const verifieBadge = verifieGPS ? `<span class="badge-verified"><i class="bi bi-patch-check-fill"></i> VÉRIFIÉ GPS</span>` : '';
         
+        // Affichage des prix si disponibles
         const prixRange = (prixMin > 0 && prixMax > 0) ? 
                             `<p class="price-range mb-2">Estimation Prix : ${prixMin.toLocaleString('fr-FR')} - ${prixMax.toLocaleString('fr-FR')} FCFA</p>` : 
                             '<p class="price-range mb-2 text-secondary-text">Prix non estimé, contactez pour devis.</p>';
@@ -301,31 +308,31 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
 
 
 // =====================================================================
-// LOGIQUE DE DÉTECTION DES MOTS-CLÉS (CORRIGÉE)
+// LOGIQUE DE DÉTECTION DES MOTS-CLÉS (CORRIGÉE ET ROBUSTE)
 // =====================================================================
 
 function normalizeKeyword(word) {
-    // Suppression du pluriel (doit être fait avant les autres remplacements)
+    // 1. Suppression du pluriel
     if (word.endsWith('s') && word.length > 3) {
         word = word.slice(0, -1);
     }
     
-    // Gère les variations d'informaticien
+    // 2. Correction des fautes de frappe et variations courantes
     if (word.includes('informaticien') || word.includes('dev') || word.includes('programm') || word.includes('informatique')) {
         return 'informatique'; 
     }
-    // Gère les variations de "plombier"
     if (word.includes('plomb')) {
         return 'plomberie';
     }
-    // Gère le typo "baque" pour "banque" (Nouveau)
+    // Correction de la faute de frappe "baque" (banque)
     if (word.includes('baque')) {
         return 'banque';
     }
-    // Gère le typo "oruche" pour "proche" (Nouveau)
+    // Correction de la faute de frappe "oruche" (proche)
     if (word.includes('oruche')) {
         return 'proche';
     }
+    
     return word;
 }
 
@@ -335,33 +342,32 @@ function getKeywords(query) {
     const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 1);
     let keywordActivite = null;
     let keywordVille = null;
-    let usedWords = [];
+    let queryWordsUsed = []; // Pour traquer les mots utilisés
     let motsFiltre = [];
     let typeRecherche = 'pro'; 
-    let queryWordsUsed = []; // Pour traquer les mots utilisés dans la détection
 
-    // 1. Détection de l'Activité ou du Lieu d'Intérêt (Priorité : le cœur de la recherche)
+    // 1. Détection de l'Activité ou du Lieu d'Intérêt (Priorité)
     for (const word of words) {
         if (STOP_WORDS.includes(word)) continue;
         
         const normalizedWord = normalizeKeyword(word); 
         
-        // A. Vérifie si c'est une activité professionnelle ou secteur
+        // A. Vérifie si c'est une activité ou secteur
         const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord)) || 
                                     ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
                                     
         if (isSectorOrSpecialty) {
             keywordActivite = normalizedWord; 
             queryWordsUsed.push(word);
-            break; // On a trouvé l'activité principale, on passe à la ville
+            break; 
         }
 
-        // B. Vérifie si c'est un Lieu d'Intérêt (Banque, Hôpital...)
+        // B. Vérifie si c'est un Lieu d'Intérêt
         if (PLACES_OF_INTEREST[normalizedWord]) {
             keywordActivite = PLACES_OF_INTEREST[normalizedWord]; 
             queryWordsUsed.push(word);
             typeRecherche = 'lieu';
-            break; // On a trouvé le lieu d'intérêt, on passe à la ville
+            break; 
         }
     }
 
@@ -383,9 +389,8 @@ function getKeywords(query) {
         }
     }
     
-    // CAS SPÉCIAL : Si l'activité trouvée est 'proche', cela signifie que 'proche' a été mis en stop word, on le retire des mots filtres.
-    if (keywordActivite === 'proche' || motsFiltre.includes('proche')) {
-        motsFiltre = motsFiltre.filter(mot => mot !== 'proche');
+    // Si l'activité trouvée est 'proche', on l'ignore car ce n'est pas une activité
+    if (keywordActivite === 'proche') {
         keywordActivite = null;
     }
     
@@ -404,13 +409,10 @@ function processBotResponse(query) {
     
     let { activite, ville, autresMots, typeRecherche } = getKeywords(query);
 
-    // DÉCLENCHEUR DE RECHERCHE : On cherche dès qu'un élément significatif (Activité OU Ville) est trouvé.
-    if (activite || ville) {
+    // On cherche dès qu'une activité OU une ville est trouvée, ou si des mots filtres sont là (pour recherche nom/quartier)
+    if (activite || ville || autresMots.length > 0) {
         
-        // Gère le cas où l'activité est toujours 'proche' ou une variation qui n'est pas un vrai pro
-        if (activite === 'proche') activite = null; 
-
-        // Si l'activité est null, on doit avoir une ville OU des mots filtres (recherche par nom/quartier)
+        // Cas où seulement un mot libre est donné (trop vague)
         if (!activite && !ville && autresMots.length > 0) {
              addMessage("Veuillez inclure l'**Activité** ou la **Ville** pour affiner la recherche par Nom/Quartier.", 'bot');
              return;
@@ -462,7 +464,6 @@ function searchProfessionals(activite, ville, autresMots) {
 
         // 2. FILTRE PAR ACTIVITÉ (ou Secteur mappé)
         if (activite) {
-            // Le mot-clé (qui est normalisé) doit se retrouver dans l'activité ou le secteur
             matchActivite = proActivite.includes(activite) || proSecteur.includes(activite);
         } else {
             matchActivite = true; 
@@ -479,7 +480,7 @@ function searchProfessionals(activite, ville, autresMots) {
             matchAutres = true; 
         }
         
-        // Le professionnel est inclus si TOUS les critères trouvés correspondent
+        // Le professionnel est inclus si TOUS les critères fournis correspondent
         return matchActivite && matchVille && matchAutres;
     });
 }
