@@ -1,7 +1,7 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
+// ⚠️ ÉTAPE 1 : URL API AVEC LE GID CORRIGÉ (Ligne inchangée)
 // =====================================================================
-const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
+const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json&gid=968871846'; 
 // =====================================================================
 
 let proData = []; 
@@ -18,7 +18,7 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE ET MAPPAGE POUR LIEUX D'INTÉRÊT
+// LISTES DE RÉFÉRENCE ET MAPPAGE (INCHANGÉES)
 // =====================================================================
 const SECTOR_COLUMNS = [
     'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
@@ -30,7 +30,6 @@ const SECTOR_COLUMNS = [
     'Commerce général'
 ];
 
-// NOUVEAU : Mappage des lieux d'intérêt vers les secteurs de la base
 const PLACES_OF_INTEREST = {
     'banque': 'finance / assurance',
     'assurance': 'finance / assurance',
@@ -77,9 +76,12 @@ const ALL_CITIES = [
     'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
 ].map(city => city.toLowerCase()); 
 
-const STOP_WORDS = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'pour', 'dans', 'au', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'plus', 'proche', 'où'];
+const STOP_WORDS = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'pour', 'dans', 'au', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'plus', 'proche', 'où', 'quelle', 'est', 'fourchette', 'prix', 'd'];
 
-// ... (fonctions showPage, addMessage, handleUserQuery, loadSheetData sont inchangées)
+
+// =====================================================================
+// FONCTIONS DE L'INTERFACE (inchangées)
+// =====================================================================
 
 function showPage(pageId) { 
     if (pageId === 'chat') {
@@ -117,6 +119,11 @@ userInput.addEventListener('keypress', (e) => {
     }
 });
 
+
+// =====================================================================
+// FONCTION DE CHARGEMENT DES DONNÉES (inchangée)
+// =====================================================================
+
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
     
@@ -130,7 +137,12 @@ async function loadSheetData() {
         
         // Trouver les index des colonnes basées sur leurs libellés dans le Google Sheet
         const HEADER_MAP = {
-            'Nom_Pro': 1, 'Entreprise': 2, 'Telephone': 3, 'Quartier': 4, 'Ville': 5, 'Secteur_General': 6,
+            'Nom_Pro': headers.findIndex(h => h.includes('Nom_Pro')), 
+            'Entreprise': headers.findIndex(h => h.includes('Entreprise')), 
+            'Telephone': headers.findIndex(h => h.includes('Telephone')), 
+            'Quartier': headers.findIndex(h => h.includes('Quartier')), 
+            'Ville': headers.findIndex(h => h.includes('Ville')), 
+            'Secteur_General': headers.findIndex(h => h.includes('Secteur_General')),
             'Note': headers.findIndex(h => h === 'Note'),
             'Expérience_Ans': headers.findIndex(h => h === 'Expérience_Ans'),
             'Verifie_GPS': headers.findIndex(h => h === 'Verifie_GPS'),
@@ -141,7 +153,9 @@ async function loadSheetData() {
 
         const formattedData = rows.map(row => {
             const cells = row.c;
-            if (!cells[1] || !cells[3] || !cells[5]) return null; // Filtre pour les lignes vides ou incomplètes
+            
+            if (HEADER_MAP.Nom_Pro === -1 || HEADER_MAP.Telephone === -1 || HEADER_MAP.Ville === -1 || 
+                !cells[HEADER_MAP.Nom_Pro] || !cells[HEADER_MAP.Telephone] || !cells[HEADER_MAP.Ville]) return null; 
 
             let activiteDetaillee = '';
             let secteurGeneral = cells[HEADER_MAP.Secteur_General] && cells[HEADER_MAP.Secteur_General].v ? cells[HEADER_MAP.Secteur_General].v : 'Inconnu'; 
@@ -154,7 +168,6 @@ async function loadSheetData() {
             }
 
             return {
-                // Champs de base
                 nom: cells[HEADER_MAP.Nom_Pro] && cells[HEADER_MAP.Nom_Pro].v ? cells[HEADER_MAP.Nom_Pro].v : '',
                 entreprise: cells[HEADER_MAP.Entreprise] && cells[HEADER_MAP.Entreprise].v ? cells[HEADER_MAP.Entreprise].v : '',
                 telephone: cells[HEADER_MAP.Telephone] && cells[HEADER_MAP.Telephone].v ? cells[HEADER_MAP.Telephone].v : '',
@@ -162,18 +175,15 @@ async function loadSheetData() {
                 ville: cells[HEADER_MAP.Ville] && cells[HEADER_MAP.Ville].v ? cells[HEADER_MAP.Ville].v : '',
                 secteur: secteurGeneral,
                 activite: activiteDetaillee,
-                
-                // Nouveaux Champs de Confiance
                 note: cells[HEADER_MAP.Note] && cells[HEADER_MAP.Note].v ? parseFloat(cells[HEADER_MAP.Note].v) : 0,
                 experience: cells[HEADER_MAP.Expérience_Ans] && cells[HEADER_MAP.Expérience_Ans].v ? parseInt(cells[HEADER_MAP.Expérience_Ans].v) : 0,
                 verifieGPS: cells[HEADER_MAP.Verifie_GPS] && cells[HEADER_MAP.Verifie_GPS].v ? cells[HEADER_MAP.Verifie_GPS].v : 'NON',
                 prixMin: cells[HEADER_MAP.Prix_Min] && cells[HEADER_MAP.Prix_Min].v ? parseFloat(cells[HEADER_MAP.Prix_Min].v) : 0,
                 prixMax: cells[HEADER_MAP.Prix_Max] && cells[HEADER_MAP.Prix_Max].v ? parseFloat(cells[HEADER_MAP.Prix_Max].v) : 0
             };
-        }).filter(item => item && item.activite.trim() !== ''); // Supprimer les lignes nulles ou sans activité
+        }).filter(item => item && item.activite.trim() !== '');
 
         proData = formattedData.map(item => {
-            // Convertir tous les champs de recherche en minuscules pour la recherche
             return {
                 ...item,
                 nom: item.nom.toLowerCase(),
@@ -185,7 +195,7 @@ async function loadSheetData() {
             }
         });
 
-        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot');
+        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot'); 
 
     } catch (error) {
         addMessage("❌ Erreur de connexion aux données. Assurez-vous que le Sheet est public et que l'ID est correct.", 'bot');
@@ -194,11 +204,14 @@ async function loadSheetData() {
 }
 
 
+// =====================================================================
+// FONCTION D'AFFICHAGE DES RÉSULTATS (inchangée)
+// =====================================================================
+
 function displayResults(results, activite, ville, autresMots, typeRecherche) {
     const chatBoxElement = document.getElementById('chat-box');
     let delay = 0.0; 
 
-    // Tri par Note (la plus haute en premier), puis par Expérience
     results.sort((a, b) => {
         if (b.note !== a.note) {
             return b.note - a.note; 
@@ -212,14 +225,11 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
     const triInfo = results.length > 0 ? `Trié par **Note ${noteMoyenne.toFixed(1)}⭐**.` : '';
 
     if (results.length > 0 && typeRecherche === 'lieu') {
-        // Message spécifique pour la recherche de lieux (Banque, Hôpital...)
         addMessage(`<p>💡 L'IA a trouvé des professionnels dans le secteur **${activite.toUpperCase()}** près de ${ville || 'votre zone'} :</p>`, 'bot');
     } else if (results.length > 0) {
-        // Message standard pour la recherche pro
         addMessage(`<p>✅ J'ai trouvé **${results.length}** résultat(s) pour ${recherche}. ${triInfo}</p>`, 'bot');
     }
 
-    // --- Affichage des Cartes ---
     results.forEach(pro => {
         const note = pro.note || 0;
         const experience = pro.experience || 0;
@@ -239,7 +249,6 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
         
         const nomAffichage = pro.entreprise.trim() ? `${pro.entreprise.toUpperCase()} (par ${pro.nom.toUpperCase()})` : pro.nom.toUpperCase();
         const quartierInfo = pro.quartier.trim() ? `, ${pro.quartier.toUpperCase()}` : '';
-
 
         const html = `
             <div class="result-card animated-result-card" style="animation-delay: ${delay}s;">
@@ -280,12 +289,16 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
 }
 
 
+// =====================================================================
+// LOGIQUE DU CHATBOT (CORRECTION MAJEURE dans getKeywords et processBotResponse)
+// =====================================================================
+
 function normalizeKeyword(word) {
     if (word.endsWith('s') && word.length > 3) {
         word = word.slice(0, -1);
     }
-    // Gère les variations d'informaticien
-    if (word.includes('informaticien') || word.includes('dev') || word.includes('programm')) {
+    // Gère les variations d'informaticien (Renforcé)
+    if (word.includes('informaticien') || word.includes('dev') || word.includes('programm') || word.includes('informatique')) {
         return 'informatique'; 
     }
     // Gère les variations de "plombier"
@@ -297,32 +310,21 @@ function normalizeKeyword(word) {
 
 
 function getKeywords(query) {
-    const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2);
+    const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 1); // Taille minimum 2 pour la ville/activité
     let keywordActivite = null;
     let keywordVille = null;
-    let nonUsedWords = [];
     let usedWords = [];
-    let typeRecherche = 'pro'; // 'pro' ou 'lieu'
-    let motsFiltre = []; // Mots restants pour filtrage Nom/Quartier
+    let motsFiltre = [];
+    let typeRecherche = 'pro'; 
 
-    // 1. Détection de la Ville (Priorité : elle est la plus simple à identifier)
+    // 1. Détection de l'Activité ou du Lieu d'Intérêt (Priorité pour le sens de la requête)
     for (const word of words) {
-        if (ALL_CITIES.includes(word)) { 
-            keywordVille = word;
-            usedWords.push(word);
-            break; 
-        } 
-    }
-
-    // 2. Détection de l'Activité ou du Lieu d'Intérêt
-    for (const word of words) {
-        if (usedWords.includes(word) || STOP_WORDS.includes(word)) continue;
+        if (STOP_WORDS.includes(word)) continue;
         
         const normalizedWord = normalizeKeyword(word); 
         
-        // A. Vérifie si c'est une activité professionnelle
-        const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) || 
-                                    ALL_SPECIALTIES.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
+        // A. Vérifie si c'est une activité professionnelle ou secteur
+        const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord)) || 
                                     ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
                                     
         if (isSectorOrSpecialty) {
@@ -331,7 +333,7 @@ function getKeywords(query) {
             break;
         }
 
-        // B. Vérifie si c'est un Lieu d'Intérêt (Banque, Hôpital, Restaurant)
+        // B. Vérifie si c'est un Lieu d'Intérêt (Banque, Hôpital...)
         if (PLACES_OF_INTEREST[normalizedWord]) {
             keywordActivite = PLACES_OF_INTEREST[normalizedWord]; 
             usedWords.push(word);
@@ -339,7 +341,17 @@ function getKeywords(query) {
             break;
         }
     }
-    
+
+    // 2. Détection de la Ville (Seconde priorité)
+    for (const word of words) {
+        if (usedWords.includes(word) || STOP_WORDS.includes(word)) continue;
+        if (ALL_CITIES.includes(word)) { 
+            keywordVille = word;
+            usedWords.push(word);
+            break; 
+        } 
+    }
+
     // 3. Le reste des mots non utilisés est le filtre libre (Nom, Entreprise, Quartier)
     for (const word of words) {
         if (!usedWords.includes(word) && !STOP_WORDS.includes(word)) {
@@ -358,28 +370,29 @@ function getKeywords(query) {
 
 function processBotResponse(query) {
     const lowerQuery = query.toLowerCase();
+    
+    let { activite, ville, autresMots, typeRecherche } = getKeywords(query);
 
-    // Condition pour lancer une recherche (plus souple, inclut les lieux)
-    if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('où est') || lowerQuery.includes('la plus proche')) {
+    // DÉCLENCHEUR DE RECHERCHE SIMPLIFIÉ : Si une activité OU une ville est trouvée, on cherche.
+    if (activite || ville || autresMots.length > 0) {
         
-        let { activite, ville, autresMots, typeRecherche } = getKeywords(query);
+        // C'était la cause de l'échec pour 'informaticien à cotonou' si activite était null ou mal formaté.
+        if (activite === 'informaticien') activite = 'informatique'; 
         
-        // Vérification du minimum : Au moins une activité OU une ville doit être fournie.
-        if (!activite && !ville && autresMots.length === 0) {
+        // Gestion de la requête trop vague si un mot libre est le seul critère
+        if (!activite && !ville && autresMots.length > 0) {
             consecutiveBadQueries++;
-            
             if (consecutiveBadQueries >= 2) { 
-                addMessage("🚨 **ATASSA !** Je dois comprendre l'Activité ou la Ville. Exemple : **Plombier à Cotonou** ou **Où est la banque à Parakou ?**", 'bot');
-                consecutiveBadQueries = 0;
-                return;
+                 addMessage("🚨 **ATASSA !** Votre recherche est trop vague. Veuillez inclure l'**Activité** (ex: Plombier) ou la **Ville** (ex: Cotonou).", 'bot');
+                 consecutiveBadQueries = 0;
+                 return;
             }
-            
-            addMessage("Veuillez être plus précis. Je dois connaître l'**Activité**, le **Lieu** ou la **Ville**.", 'bot');
-            return;
+             addMessage("Veuillez être plus précis. Je dois connaître l'**Activité** ou la **Ville** en plus de ce mot-clé libre.", 'bot');
+             return;
         }
 
-        consecutiveBadQueries = 0; 
 
+        consecutiveBadQueries = 0; 
         let results = searchProfessionals(activite, ville, autresMots);
         
         displayResults(results, activite, ville, autresMots, typeRecherche);
@@ -430,7 +443,7 @@ function searchProfessionals(activite, ville, autresMots) {
             matchActivite = true; 
         }
         
-        // 3. FILTRE PAR AUTRES MOTS
+        // 3. FILTRE PAR AUTRES MOTS (Nom, Entreprise, Quartier)
         if (motsFiltre.length > 0) {
             matchAutres = motsFiltre.some(mot => 
                 proNom.includes(mot) || 
@@ -441,6 +454,7 @@ function searchProfessionals(activite, ville, autresMots) {
             matchAutres = true; 
         }
         
+        // Le professionnel est inclus si TOUS les critères trouvés correspondent
         return matchActivite && matchVille && matchAutres;
     });
 }
