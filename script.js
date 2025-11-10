@@ -1,8 +1,8 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
-// (N'oubliez pas d'insérer votre ID entre les crochets)
+// ⚠️ ÉTAPE 1 : CORRECTION DE L'URL API AVEC LE GID DU BON ONGLET
 // =====================================================================
-const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
+// L'URL est corrigée pour cibler explicitement l'onglet gid=968871846
+const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json&gid=968871846'; 
 // =====================================================================
 
 let proData = []; 
@@ -19,7 +19,7 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE ET MAPPAGE POUR LIEUX D'INTÉRÊT (NOUVEAU)
+// LISTES DE RÉFÉRENCE ET MAPPAGE POUR LIEUX D'INTÉRÊT (INCHANGÉES)
 // =====================================================================
 const SECTOR_COLUMNS = [
     'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
@@ -81,7 +81,7 @@ const ALL_CITIES = [
 const STOP_WORDS = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'pour', 'dans', 'au', 'je', 'tu', 'il', 'elle', 'nous', 'vous', 'ils', 'elles', 'suis', 'est', 'y', 'plus', 'proche', 'où'];
 
 // =====================================================================
-// FONCTIONS DE L'INTERFACE (showPage, addMessage, handleUserQuery)
+// FONCTIONS DE L'INTERFACE (inchangées)
 // =====================================================================
 
 function showPage(pageId) { 
@@ -157,7 +157,8 @@ async function loadSheetData() {
             const cells = row.c;
             
             // Vérification minimum pour ignorer les lignes vides
-            if (!cells[HEADER_MAP.Nom_Pro] || !cells[HEADER_MAP.Telephone] || !cells[HEADER_MAP.Ville]) return null; 
+            if (HEADER_MAP.Nom_Pro === -1 || HEADER_MAP.Telephone === -1 || HEADER_MAP.Ville === -1 || 
+                !cells[HEADER_MAP.Nom_Pro] || !cells[HEADER_MAP.Telephone] || !cells[HEADER_MAP.Ville]) return null; 
 
             let activiteDetaillee = '';
             let secteurGeneral = cells[HEADER_MAP.Secteur_General] && cells[HEADER_MAP.Secteur_General].v ? cells[HEADER_MAP.Secteur_General].v : 'Inconnu'; 
@@ -202,7 +203,8 @@ async function loadSheetData() {
             }
         });
 
-        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot');
+        // VÉRIFIEZ CE MESSAGE : Si vous voyez ce message, c'est que la connexion est OK.
+        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot'); 
 
     } catch (error) {
         addMessage("❌ Erreur de connexion aux données. Assurez-vous que le Sheet est public et que l'ID est correct.", 'bot');
@@ -212,7 +214,7 @@ async function loadSheetData() {
 
 
 // =====================================================================
-// FONCTION D'AFFICHAGE DES RÉSULTATS (MISE À JOUR AVEC LES CARTES PREMIUM)
+// FONCTION D'AFFICHAGE DES RÉSULTATS (inchangée)
 // =====================================================================
 
 function displayResults(results, activite, ville, autresMots, typeRecherche) {
@@ -305,7 +307,7 @@ function displayResults(results, activite, ville, autresMots, typeRecherche) {
 
 
 // =====================================================================
-// LOGIQUE DU CHATBOT (MISE À JOUR AVEC LA RECHERCHE DE LIEUX D'INTÉRÊT)
+// LOGIQUE DU CHATBOT (inchangée)
 // =====================================================================
 
 function normalizeKeyword(word) {
@@ -476,4 +478,3 @@ function searchProfessionals(activite, ville, autresMots) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
-
