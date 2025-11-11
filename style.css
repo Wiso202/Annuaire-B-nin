@@ -159,7 +159,7 @@ body {
 }
 
 /* ===================================================================== */
-/* STYLES DU CHAT CONVERSATIONNEL (Digne du Nom) */
+/* STYLES DU CHAT CONVERSATIONNEL (Mise à jour pour les cartes de résultat) */
 /* ===================================================================== */
 
 .chat-main-block {
@@ -211,13 +211,13 @@ body {
     box-shadow: 0 2px 5px rgba(255, 215, 0, 0.3);
 }
 
-/* --- Carte de Résultat (Remplacement de la bulle pour les pros) --- */
-@keyframes card-fade-in-up {
+/* --- Carte de Résultat --- */
+@keyframes card-fade-in_up {
     from { opacity: 0; transform: translateY(15px); }
     to { opacity: 1; transform: translateY(0); }
 }
 .animated-result-card {
-    animation: card-fade-in-up 0.5s ease-out forwards;
+    animation: card-fade-in_up 0.5s ease-out forwards;
 }
 
 .bot-message .result-card {
@@ -235,7 +235,7 @@ body {
     box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3); 
 }
 
-/* NOUVEAU: Style des étoiles */
+/* NOUVEAU: Style des étoiles (CORRIGÉ) */
 .star-rating {
     font-size: 1.2rem;
     color: var(--accent-color); /* Étoiles en Or */
@@ -244,39 +244,41 @@ body {
 }
 
 /* NOUVEAU: Ligne pour les notes et l'expérience */
-.price-experience-line {
+.note-line {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-top: 5px;
     font-size: 0.9rem;
     padding-bottom: 5px;
+    border-bottom: 1px dashed #333;
+    margin-bottom: 8px;
 }
 
-/* NOUVEAU: Texte d'expérience */
+/* NOUVEAU: Texte d'expérience (CORRIGÉ) */
 .experience-text {
     color: var(--secondary-text); 
-    font-style: italic;
+    font-style: normal;
     font-weight: normal;
+}
+.experience-text span {
+    font-weight: bold;
+    color: var(--text-light); /* Met en évidence la valeur */
 }
 
 /* Ligne de prix */
 .price-range {
-    color: #00d287; /* Utilisation d'une couleur secondaire pour le prix (Vert) */
+    color: #00d287; /* Couleur secondaire pour le prix (Vert) */
     font-size: 0.9rem;
     margin-bottom: 8px;
     font-style: italic;
-    border-top: 1px dashed #333;
-    padding-top: 8px;
-    margin-top: 8px;
     font-weight: bold;
 }
 
-/* Badge VÉRIFIÉ GPS (Adaptation de la classe existante) */
+/* Badge VÉRIFIÉ GPS */
 .badge-verified {
-    /* Style du badge pour être lisible à côté du nom */
-    background-color: var(--accent-color); 
-    color: var(--bg-dark);
+    background-color: #38761d; /* Vert foncé */
+    color: #ffffff;
     padding: 3px 10px;
     border-radius: 15px;
     font-size: 0.75rem;
@@ -284,18 +286,33 @@ body {
     display: inline-flex;
     align-items: center;
     margin-right: 10px;
-    /* Animation désactivée pour la lisibilité, mais la bordure Or reste */
-    box-shadow: 0 0 5px rgba(255, 215, 0, 0.5); 
-    animation: none;
+    animation: pulse-verified 2s infinite alternate; 
 }
-/* Votre ancien style d'animation est conservé, mais désactivé pour ce badge spécifique */
 @keyframes pulse-verified {
     from { box-shadow: 0 0 5px rgba(56, 118, 29, 0.5); }
     to { box-shadow: 0 0 10px var(--accent-color), 0 0 10px rgba(56, 118, 29, 0.8); }
 }
 
+/* NOUVEAU: Lien vers la localisation du Pro */
+.location-link {
+    display: inline-block;
+    color: #5bc0de; /* Couleur pour le lien de localisation (Bleu) */
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+.location-link:hover {
+    color: var(--accent-color);
+}
+
 .whatsapp-link {
     color: var(--link-color); 
+    display: block;
+    text-decoration: none;
+    font-weight: bold;
+    margin-top: 10px;
 }
 .whatsapp-link:hover {
     color: var(--accent-color); 
