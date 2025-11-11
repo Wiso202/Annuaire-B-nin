@@ -1,10 +1,12 @@
 // =====================================================================
 // ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
 // =====================================================================
-const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
+const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json';
 // =====================================================================
 
-let proData = []; 
+let proData = [];
+// Nouvelle variable pour stocker la position de l'utilisateur
+let userLocation = null;
 
 // Éléments DOM (répétés pour la clarté, mais non modifiés)
 const chatBox = document.getElementById('chat-box');
@@ -15,18 +17,17 @@ const chatPage = document.getElementById('chat-page');
 const startChatBtn = document.getElementById('start-chat-btn');
 const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
-
 // =====================================================================
 // LISTES DE RÉFÉRENCE (INCHANGÉES)
 // =====================================================================
 
 const SECTOR_COLUMNS = [
-    'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
-    'Tourisme / Loisirs', 'Services à la personne', 'Agriculture / Élevage / Pêche', 
-    'Droit / Juridique', 'Énergie / Environnement', 'Autres services spécialisés', 
-    'Alimentation', 'Mode / Couture', 'Beauté / Esthétique', 
-    'Technologie / Informatique', 'Automobile / Mécanique', 'BTP / Construction', 
-    'Santé / Pharmacie', 'Éducation / Formation', 'Artisanat / Création', 
+    'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias',
+    'Tourisme / Loisirs', 'Services à la personne', 'Agriculture / Élevage / Pêche',
+    'Droit / Juridique', 'Énergie / Environnement', 'Autres services spécialisés',
+    'Alimentation', 'Mode / Couture', 'Beauté / Esthétique',
+    'Technologie / Informatique', 'Automobile / Mécanique', 'BTP / Construction',
+    'Santé / Pharmacie', 'Éducation / Formation', 'Artisanat / Création',
     'Commerce général'
 ];
 
@@ -53,20 +54,21 @@ const ALL_SPECIALTIES = [
 ];
 
 const ALL_CITIES = [
-    'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Malanville', 'Segbana', 'Boukoumbé', 'Cobly', 'Kérou', 'Kouandé', 
-    'Matéri', 'Natitingou', 'Péhunco', 'Tanguiéta', 'Toucountouna', 'Abomey-Calavi', 'Allada', 'Kpomassè', 'Ouidah', 
-    'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè', 'Bembéréké', 'Kalalé', 'N\'Dali', 'Nikki', 'Parakou', 'Pèrèrè', 'Sinendé', 
-    'Tchaourou', 'Bantè', 'Dassa-Zoumé', 'Glazoué', 'Ouèssè', 'Savalou', 'Savè', 'Aplahoué', 'Djakotomey', 'Dogbo', 
-    'Klouékanmè', 'Lalo', 'Toviklin', 'Bassila', 'Copargo', 'Djougou', 'Ouaké', 'Cotonou', 'Athiémè', 'Bopa', 'Comè', 
-    'Grand-Popo', 'Houéyogbé', 'Lokossa', 'Adjarra', 'Adjohoun', 'Aguégués', 'Akpro-Missérété', 'Avrankou', 'Bonou', 
-    'Dangbo', 'Porto-Novo', 'Sèmè-Kpodji', 'Ifangni', 'Kétou', 'Pobè', 'Sakété', 'Abomey', 'Agbangnizoun', 'Bohicon', 
+    'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Malanville', 'Segbana', 'Boukoumbé', 'Cobly', 'Kérou', 'Kouandé',
+    'Matéri', 'Natitingou', 'Péhunco', 'Tanguiéta', 'Toucountouna', 'Abomey-Calavi', 'Allada', 'Kpomassè', 'Ouidah',
+    'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè', 'Bembéréké', 'Kalalé', 'N\'Dali', 'Nikki', 'Parakou', 'Pèrèrè', 'Sinendé',
+    'Tchaourou', 'Bantè', 'Dassa-Zoumé', 'Glazoué', 'Ouèssè', 'Savalou', 'Savè', 'Aplahoué', 'Djakotomey', 'Dogbo',
+    'Klouékanmè', 'Lalo', 'Toviklin', 'Bassila', 'Copargo', 'Djougou', 'Ouaké', 'Cotonou', 'Athiémè', 'Bopa', 'Comè',
+    'Grand-Popo', 'Houéyogbé', 'Lokossa', 'Adjarra', 'Adjohoun', 'Aguégués', 'Akpro-Missérété', 'Avrankou', 'Bonou',
+    'Dangbo', 'Porto-Novo', 'Sèmè-Kpodji', 'Ifangni', 'Kétou', 'Pobè', 'Sakété', 'Abomey', 'Agbangnizoun', 'Bohicon',
     'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
-].map(city => city.toLowerCase()); 
+].map(city => city.toLowerCase());
+
+const GEO_KEYWORDS = ['banque', 'hôpital', 'pharmacie', 'commissariat', 'poste', 'urgence', 'distributeur', 'supermarché'];
 
 // =====================================================================
-// FONCTIONS DE BASE (INCHANGÉES)
+// FONCTIONS DE BASE
 // =====================================================================
-// [Fonctions showPage, addMessage, handleUserQuery, sendBtn.addEventListener, etc. sont inchangées]
 function showPage(pageId) {
     if (pageId === 'home') {
         homePage.style.opacity = 1;
@@ -76,20 +78,20 @@ function showPage(pageId) {
         setTimeout(() => {
             homePage.classList.remove('d-none');
             chatPage.classList.add('d-none');
-        }, 500); 
+        }, 500);
 
     } else if (pageId === 'chat') {
         chatPage.style.opacity = 0;
         chatPage.style.transform = 'translateX(100%)';
         chatPage.classList.remove('d-none');
-        
+
         setTimeout(() => {
             homePage.style.opacity = 0;
             chatPage.style.opacity = 1;
             chatPage.style.transform = 'translateX(0)';
             userInput.focus();
-        }, 50); 
-        
+        }, 50);
+
         setTimeout(() => {
             homePage.classList.add('d-none');
         }, 500);
@@ -101,13 +103,13 @@ accueilBtnNav.addEventListener('click', () => showPage('home'));
 function addMessage(text, sender) {
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message', 'animated-message');
-    
+
     if (sender === 'bot') {
         messageDiv.innerHTML = text;
     } else {
         messageDiv.textContent = text;
     }
-    
+
     chatBox.appendChild(messageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
@@ -126,36 +128,91 @@ userInput.addEventListener('keypress', (e) => {
         handleUserQuery();
     }
 });
-// [Fonction loadSheetData est inchangée]
+
+// =====================================================================
+// NOUVELLES FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES
+// =====================================================================
+
+// Conversion de la note numérique en étoiles HTML
+function getStarRating(note) {
+    const fullStars = Math.floor(note);
+    const hasHalfStar = (note - fullStars) >= 0.5;
+    let stars = '';
+
+    for (let i = 0; i < fullStars; i++) {
+        stars += '⭐';
+    }
+    if (hasHalfStar) {
+        stars += '⭐'; // Utilisé comme demi-étoile simple (simplification d'affichage)
+    }
+    for (let i = stars.length; i < 5; i++) {
+        stars += '☆';
+    }
+    return `<span class="star-rating">${stars}</span>`;
+}
+
+// Fonction utilitaire pour formater les nombres en FCFA
+function formatFCFA(number) {
+    if (number === null || isNaN(number)) return '';
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF' }).format(number).replace('XOF', 'FCFA').replace(/\s/g, ' ');
+}
+
+// Fonction de tri (La meilleure note ET la meilleure expérience en premier)
+function sortProfessionals(a, b) {
+    // 1. Priorité à la Note
+    if (b.note !== a.note) {
+        return b.note - a.note; // Tri décroissant (meilleure note d'abord)
+    }
+    // 2. Si les notes sont égales, prioriser l'Expérience
+    return b.experience - a.experience; // Tri décroissant (plus d'expérience d'abord)
+}
+
+
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
-    
+
     try {
         const response = await fetch(SHEET_API_URL);
         const text = await response.text();
-        
+
         const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
         const data = JSON.parse(jsonText);
-        
+
         const rows = data.table.rows;
         const headers = data.table.cols.map(col => col.label);
-        
+
         // Détermination de l'index de départ des colonnes d'activité réelle (Finance / Assurance)
-        const ACTIVITY_START_INDEX = headers.findIndex(h => h.includes('Finance / Assurance')); 
+        const ACTIVITY_START_INDEX = headers.findIndex(h => h.includes('Finance / Assurance'));
+        
+        // Nouveaux index pour les colonnes de qualité
+        const NOTE_INDEX = headers.findIndex(h => h.includes('Note'));
+        const EXPERIENCE_INDEX = headers.findIndex(h => h.includes('Expérience_Ans'));
+        const VERIFIE_GPS_INDEX = headers.findIndex(h => h.includes('Verifie_GPS'));
+        const PRIX_MIN_INDEX = headers.findIndex(h => h.includes('Prix_Min'));
+        const PRIX_MAX_INDEX = headers.findIndex(h => h.includes('Prix_Max'));
+
 
         const formattedData = rows.slice(1).map(row => {
             const cells = row.c;
 
             // Reconstruction du VRAI métier/activité
             let activiteDetaillee = '';
-            let secteurGeneral = cells[6] ? cells[6].v : 'Inconnu'; 
+            let secteurGeneral = cells[6] ? cells[6].v : 'Inconnu';
 
             for (let i = ACTIVITY_START_INDEX; i < ACTIVITY_START_INDEX + SECTOR_COLUMNS.length; i++) {
                 if (cells[i] && cells[i].v) {
-                    activiteDetaillee = cells[i].v; 
+                    activiteDetaillee = cells[i].v;
                     break;
                 }
             }
+            
+            // Extraction des nouvelles données (avec vérification et conversion)
+            const noteCell = cells[NOTE_INDEX];
+            const experienceCell = cells[EXPERIENCE_INDEX];
+            const prixMinCell = cells[PRIX_MIN_INDEX];
+            const prixMaxCell = cells[PRIX_MAX_INDEX];
+            const verifieGpsCell = cells[VERIFIE_GPS_INDEX];
+
 
             // Indices: [1]=Nom, [2]=Entreprise, [3]=Contact WhatsApp, [4]=Quartier, [5]=Ville
             return {
@@ -165,7 +222,14 @@ async function loadSheetData() {
                 quartier: cells[4] ? cells[4].v : '',
                 ville: cells[5] ? cells[5].v : '',
                 secteur: secteurGeneral,
-                activite: activiteDetaillee // La spécialité exacte
+                activite: activiteDetaillee, // La spécialité exacte
+                
+                // NOUVEAUX CHAMPS
+                note: noteCell && noteCell.v !== null ? parseFloat(noteCell.v) : 0, // 0 par défaut
+                experience: experienceCell && experienceCell.v !== null ? parseInt(experienceCell.v) : 0, // 0 par défaut
+                verifie_gps: verifieGpsCell && verifieGpsCell.v ? verifieGpsCell.v.toUpperCase() === 'OUI' : false,
+                prix_min: prixMinCell && prixMinCell.v !== null ? parseFloat(prixMinCell.v) : null,
+                prix_max: prixMaxCell && prixMaxCell.v !== null ? parseFloat(prixMaxCell.v) : null,
             };
         }).filter(item => item.activite.trim() !== ''); // N'inclut que les lignes ayant une activité réelle
 
@@ -177,22 +241,43 @@ async function loadSheetData() {
         console.error("Erreur de chargement des données :", error);
     }
 }
-// [Fonction displayResults est inchangée]
+
 function displayResults(results, activite, ville) {
     let responseHTML = '';
     const recherche = `**${activite || 'Professionnel'}** ${ville ? 'à **' + ville + '**' : ''}`;
 
     if (results.length > 0) {
-        responseHTML += `<p>✅ J'ai trouvé **${results.length}** résultat(s) pour ${recherche}.</p>`;
+        // Tri des résultats avant l'affichage
+        results.sort(sortProfessionals);
         
+        responseHTML += `<p>✅ J'ai trouvé **${results.length}** résultat(s) pour ${recherche}.</p>
+                         <p class="small fst-italic">Trié par **Note** et **Expérience**.</p>`;
+
         results.forEach(pro => {
             const nomAffichage = pro.entreprise.trim() ? `${pro.entreprise} (par ${pro.nom})` : pro.nom;
             const quartierInfo = pro.quartier.trim() ? ` à ${pro.quartier}` : '';
             
+            // Badges et Infos Qualité
+            const noteEtoiles = pro.note > 0 ? getStarRating(pro.note) : '';
+            const badgeVerif = pro.verifie_gps ? '<span class="badge bg-success-light text-success fw-bold ms-2">VÉRIFIÉ GPS</span>' : '';
+            const experience = pro.experience > 0 ? `<p class="mb-0 small text-muted">Expérience : **${pro.experience} an(s)**</p>` : '';
+            
+            let prixInfo = '';
+            if (pro.prix_min !== null && pro.prix_max !== null) {
+                 prixInfo = `<p class="mb-0 small text-info fw-bold">Prix estimé : ${formatFCFA(pro.prix_min)} - ${formatFCFA(pro.prix_max)}</p>`;
+            } else if (pro.prix_min !== null) {
+                prixInfo = `<p class="mb-0 small text-info fw-bold">Prix à partir de : ${formatFCFA(pro.prix_min)}</p>`;
+            }
+
             responseHTML += `
                 <div class="result-card animated-message">
-                    <p class="mb-0 text-white fw-bold">${nomAffichage}</p>
+                    <p class="mb-0 text-white fw-bold d-flex align-items-center">${nomAffichage} ${badgeVerif}</p>
                     <p class="mb-1 text-accent small">${pro.activite} - ${pro.ville}${quartierInfo}</p>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>${noteEtoiles}</div>
+                        <div>${prixInfo}</div>
+                    </div>
+                    ${experience}
                     <a href="https://wa.me/${pro.contact.replace(/\s/g, '')}" target="_blank" class="contact-link">
                         <i class="bi bi-whatsapp"></i> Contacter via WhatsApp
                     </a>
@@ -203,16 +288,75 @@ function displayResults(results, activite, ville) {
         responseHTML = `<p>😔 Désolé, aucun pro n'a été trouvé pour ${recherche}.</p>
                         <p>👉 **Conseil :** Essayez d'utiliser uniquement un métier générique (ex: 'Mécanicien') ou le nom de la ville (ex: 'Cotonou').</p>`;
     }
-    
+
     addMessage(responseHTML, 'bot');
 }
 
 
 // =====================================================================
-// LOGIQUE DU CHATBOT (MISE À JOUR POUR GÉRER PLURIEL ET SYNONYMES)
+// LOGIQUE DU CHATBOT ET GÉOLOCALISATION
 // =====================================================================
 
-// NOUVELLE FONCTION D'AIDE : Normalisation du mot (Singulier simple)
+// NOUVELLE FONCTION : Gestion de la demande de géolocalisation
+function askForGeolocation(keyword) {
+    const message = `
+        <p>Pour trouver le(la) **${keyword}** le plus proche, j'ai besoin d'accéder à votre position actuelle.</p>
+        <p>Acceptez-vous de partager votre localisation ?</p>
+        <button id="geo-yes" class="btn btn-sm btn-success me-2">✅ Oui, Partager</button>
+        <button id="geo-no" class="btn btn-sm btn-danger">❌ Non, Annuler</button>
+    `;
+    addMessage(message, 'bot');
+
+    document.getElementById('geo-yes').addEventListener('click', () => {
+        addMessage('... Acquisition de votre position en cours ...', 'bot');
+        getGeolocation(keyword);
+    });
+
+    document.getElementById('geo-no').addEventListener('click', () => {
+        addMessage(`Recherche de **${keyword}** annulée. Vous pouvez réessayer en précisant une ville.`, 'bot');
+    });
+}
+
+// NOUVELLE FONCTION : Acquisition de la position GPS
+function getGeolocation(keyword) {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                addMessage(`Position obtenue : Latitude ${userLocation.lat.toFixed(4)}, Longitude ${userLocation.lng.toFixed(4)}`, 'bot');
+                searchNearby(keyword, userLocation);
+            },
+            (error) => {
+                let errorMessage = "Impossible d'obtenir votre position. Assurez-vous que la localisation est activée et autorisée pour ce site.";
+                if (error.code === error.PERMISSION_DENIED) {
+                    errorMessage = "Vous avez refusé l'accès à la localisation. Impossible de trouver le lieu le plus proche.";
+                }
+                addMessage(`❌ Erreur de géolocalisation : ${errorMessage}`, 'bot');
+            }
+        );
+    } else {
+        addMessage("❌ Votre navigateur ne supporte pas la géolocalisation.", 'bot');
+    }
+}
+
+// NOUVELLE FONCTION : Recherche Google Maps à proximité
+function searchNearby(keyword, location) {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(keyword)}&query_place_id=&center=${location.lat},${location.lng}&zoom=15`;
+
+    const responseHTML = `
+        <p>🌍 Voici le résultat de la recherche **"${keyword}"** près de votre position :</p>
+        <a href="${mapsUrl}" target="_blank" class="btn btn-primary mt-2">
+            <i class="bi bi-geo-alt-fill"></i> Afficher sur Google Maps
+        </a>
+    `;
+    addMessage(responseHTML, 'bot');
+}
+
+
+// Normalisation du mot (Singulier simple)
 function normalizeKeyword(word) {
     if (word.endsWith('s') && word.length > 3) {
         return word.slice(0, -1);
@@ -229,44 +373,58 @@ function getKeywords(query) {
     const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2);
     let keywordActivite = null;
     let keywordVille = null;
+    let keywordGeo = null; // Nouveau : mot-clé de géolocalisation
 
     for (const word of words) {
         // Normaliser le mot pour chercher le singulier ou le synonyme principal
-        const normalizedWord = normalizeKeyword(word); 
-        
+        const normalizedWord = normalizeKeyword(word);
+
         // 1. Détection de la Ville
         if (ALL_CITIES.includes(word)) { // La ville ne doit pas être normalisée
             keywordVille = word;
-        } 
+        }
         
-        // 2. Détection de l'Activité
-        const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) || 
+        // 2. Détection de Mot-Clé GÉOLOCALISATION
+        if (GEO_KEYWORDS.includes(normalizedWord)) {
+            keywordGeo = normalizedWord;
+        }
+
+        // 3. Détection de l'Activité (Profinder)
+        const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
                                     ALL_SPECIALTIES.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
                                     ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
-                                    
+
         if (isSectorOrSpecialty) {
             keywordActivite = normalizedWord; // Utiliser le mot normalisé pour la recherche
         }
     }
-    
-    // 3. Logique de secours (inchangée)
-    if (!keywordActivite) {
-        const firstRelevantWord = words.find(w => w.length > 2 && !['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur'].includes(w) && !ALL_CITIES.includes(w));
+
+    // 4. Logique de secours (inchangée pour l'activité)
+    if (!keywordActivite && !keywordGeo) {
+        const firstRelevantWord = words.find(w => w.length > 2 && !['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'plus', 'proche', 'moi'].includes(w) && !ALL_CITIES.includes(w) && !GEO_KEYWORDS.includes(w));
         if (firstRelevantWord) {
             keywordActivite = normalizeKeyword(firstRelevantWord);
         }
     }
 
-    return { activite: keywordActivite, ville: keywordVille };
+    return { activite: keywordActivite, ville: keywordVille, geo: keywordGeo };
 }
 
 function processBotResponse(query) {
     const lowerQuery = query.toLowerCase();
+    const { activite: activiteKeyword, ville: villeKeyword, geo: geoKeyword } = getKeywords(query);
+    
+    // Vérification de la demande de proximité (Hôpital/Banque le plus proche de moi)
+    const isNearbyQuery = lowerQuery.includes('plus proche') && geoKeyword;
+    
+    if (isNearbyQuery) {
+        askForGeolocation(geoKeyword);
+        return;
+    }
 
-    if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('recherche') || lowerQuery.includes('un') || lowerQuery.includes('une')) {
-        
-        let { activite: activiteKeyword, ville: villeKeyword } = getKeywords(query);
-        
+    // Logique de recherche dans l'annuaire (Profinder)
+    if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('recherche') || lowerQuery.includes('un') || lowerQuery.includes('une') || activiteKeyword) {
+
         if (!activiteKeyword && !villeKeyword) {
             addMessage("Veuillez être plus précis. Quelle **Activité** et dans quelle **Ville** ? **Exemple : Plombier à Cotonou.**", 'bot');
             return;
@@ -277,27 +435,27 @@ function processBotResponse(query) {
 
         // 2. Dégradation de la recherche (Ignorer le quartier)
         if (results.length === 0 && villeKeyword) {
-             results = searchProfessionals(query, activiteKeyword, villeKeyword, true); 
+             results = searchProfessionals(query, activiteKeyword, villeKeyword, true);
         }
-        
+
         displayResults(results, activiteKeyword, villeKeyword);
-        
+
     } else if (lowerQuery.includes('bonjour') || lowerQuery.includes('salut') || lowerQuery.includes('hello')) {
-        addMessage("Salut ! Je suis ProFinder. La règle pour la recherche est simple : **[Activité] à [Ville]**.", 'bot');
+        addMessage("Salut ! Je suis ProFinder. La règle pour la recherche est simple : **[Activité] à [Ville]**. Pour les lieux, essayez : **[Banque] le plus proche de moi**.", 'bot');
     } else {
-        addMessage("Je n'ai pas compris. Veuillez utiliser le format simple : **[Activité] à [Ville]**.", 'bot');
+        addMessage("Je n'ai pas compris. Veuillez utiliser le format simple : **[Activité] à [Ville]** ou **[Lieu] le plus proche de moi**.", 'bot');
     }
 }
 
 function searchProfessionals(query, activite, ville, degrade = false) {
     if (proData.length === 0) return [];
-    
+
     const queryWords = query ? query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2).map(normalizeKeyword) : [];
 
     return proData.filter(pro => {
         let matchActivite = false;
         let matchVille = false;
-        
+
         const proActivite = pro.activite.toLowerCase();
         const proSecteur = pro.secteur.toLowerCase();
         const proVille = pro.ville.toLowerCase();
@@ -306,12 +464,12 @@ function searchProfessionals(query, activite, ville, degrade = false) {
         // 1. Logique d'Activité
         if (activite) {
             // Correspondance sur le mot-clé principal OU si un mot-clé de la requête est dans l'activité détaillée ou le secteur
-            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
+            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) ||
                             queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
         } else {
-            matchActivite = true; 
+            matchActivite = true;
         }
-        
+
         // 2. Logique de Ville/Quartier (Dégradation)
         if (ville) {
             if (degrade) {
@@ -325,7 +483,7 @@ function searchProfessionals(query, activite, ville, degrade = false) {
         } else {
             matchVille = true;
         }
-        
+
         return matchActivite && matchVille;
     });
 }
