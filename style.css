@@ -235,18 +235,48 @@ body {
     box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3); 
 }
 
-.price-range {
+/* NOUVEAU: Style des étoiles */
+.star-rating {
+    font-size: 1.2rem;
+    color: var(--accent-color); /* Étoiles en Or */
+    display: inline-block;
+    line-height: 1;
+}
+
+/* NOUVEAU: Ligne pour les notes et l'expérience */
+.price-experience-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+    font-size: 0.9rem;
+    padding-bottom: 5px;
+}
+
+/* NOUVEAU: Texte d'expérience */
+.experience-text {
     color: var(--secondary-text); 
+    font-style: italic;
+    font-weight: normal;
+}
+
+/* Ligne de prix */
+.price-range {
+    color: #00d287; /* Utilisation d'une couleur secondaire pour le prix (Vert) */
     font-size: 0.9rem;
     margin-bottom: 8px;
     font-style: italic;
     border-top: 1px dashed #333;
     padding-top: 8px;
     margin-top: 8px;
+    font-weight: bold;
 }
+
+/* Badge VÉRIFIÉ GPS (Adaptation de la classe existante) */
 .badge-verified {
-    background-color: #38761d; 
-    color: #ffffff;
+    /* Style du badge pour être lisible à côté du nom */
+    background-color: var(--accent-color); 
+    color: var(--bg-dark);
     padding: 3px 10px;
     border-radius: 15px;
     font-size: 0.75rem;
@@ -254,12 +284,16 @@ body {
     display: inline-flex;
     align-items: center;
     margin-right: 10px;
-    animation: pulse-verified 2s infinite alternate; 
+    /* Animation désactivée pour la lisibilité, mais la bordure Or reste */
+    box-shadow: 0 0 5px rgba(255, 215, 0, 0.5); 
+    animation: none;
 }
+/* Votre ancien style d'animation est conservé, mais désactivé pour ce badge spécifique */
 @keyframes pulse-verified {
     from { box-shadow: 0 0 5px rgba(56, 118, 29, 0.5); }
     to { box-shadow: 0 0 10px var(--accent-color), 0 0 10px rgba(56, 118, 29, 0.8); }
 }
+
 .whatsapp-link {
     color: var(--link-color); 
 }
