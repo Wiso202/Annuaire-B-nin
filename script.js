@@ -74,7 +74,7 @@ const GEO_KEYWORDS = [
 
 
 // =====================================================================
-// FONCTIONS DE BASE (INCHANGÉES)
+// FONCTIONS DE BASE
 // =====================================================================
 
 function showPage(pageId) {
@@ -142,21 +142,34 @@ userInput.addEventListener('keypress', (e) => {
 // NOUVELLES FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES
 // =====================================================================
 
-// Conversion de la note numérique en étoiles HTML
+// CORRECTION: Conversion de la note numérique en étoiles HTML (pleines ★ et vides ☆)
 function getStarRating(note) {
-    const fullStars = Math.floor(note);
-    const hasHalfStar = (note - fullStars) >= 0.5;
-    let stars = '';
+    // S'assurer que la note est un nombre et entre 0 et 5
+    const normalizedNote = Math.max(0, Math.min(5, parseFloat(note)));
+    
+    // Arrondir au demi-point le plus proche (ex: 4.3 -> 4.5, 3.2 -> 3.0)
+    const roundedNote = Math.round(normalizedNote * 2) / 2; 
 
+    let stars = '';
+    
+    // Étoiles pleines (★)
+    const fullStars = Math.floor(roundedNote);
     for (let i = 0; i < fullStars; i++) {
-        stars += '★'; // Étoile pleine (ou utilisez ⭐ si vous avez un support d'emoji)
+        stars += '★'; 
     }
+    
+    // Gérer la demi-étoile (½)
+    const hasHalfStar = (roundedNote - fullStars) === 0.5;
     if (hasHalfStar) {
-        stars += '★'; // Simplification visuelle
+        stars += '½'; 
     }
-    for (let i = stars.length; i < 5; i++) {
-        stars += '☆'; // Étoile vide
+
+    // Étoiles vides (☆)
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 0.5 : 0);
+    for (let i = 0; i < Math.floor(emptyStars); i++) {
+        stars += '☆'; 
     }
+    
     return `<span class="star-rating">${stars}</span>`;
 }
 
@@ -177,7 +190,7 @@ function sortProfessionals(a, b) {
     return b.experience - a.experience; // Tri décroissant (plus d'expérience d'abord)
 }
 
-// MISE À JOUR : Lecture des nouvelles colonnes
+// MISE À JOUR : Lecture des nouvelles colonnes, y compris Latitude et Longitude
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
     
@@ -191,15 +204,17 @@ async function loadSheetData() {
         const rows = data.table.rows;
         const headers = data.table.cols.map(col => col.label);
         
-        // Détermination de l'index de départ des colonnes d'activité réelle (Finance / Assurance)
+        // Détermination de l'index de départ des colonnes d'activité réelle
         const ACTIVITY_START_INDEX = headers.findIndex(h => h.includes('Finance / Assurance')); 
 
-        // Nouveaux index pour les colonnes de qualité (Attention, ces indices dépendent de la structure de votre sheet)
+        // Index pour les colonnes de qualité et localisation
         const NOTE_INDEX = headers.findIndex(h => h.includes('Note'));
         const EXPERIENCE_INDEX = headers.findIndex(h => h.includes('Expérience_Ans'));
         const VERIFIE_GPS_INDEX = headers.findIndex(h => h.includes('Verifie_GPS'));
         const PRIX_MIN_INDEX = headers.findIndex(h => h.includes('Prix_Min'));
         const PRIX_MAX_INDEX = headers.findIndex(h => h.includes('Prix_Max'));
+        const LATITUDE_INDEX = headers.findIndex(h => h.includes('Latitude'));
+        const LONGITUDE_INDEX = headers.findIndex(h => h.includes('Longitude'));
 
 
         const formattedData = rows.slice(1).map(row => {
@@ -216,12 +231,13 @@ async function loadSheetData() {
                 }
             }
             
-            // Extraction des nouvelles données (avec vérification et conversion)
+            // Extraction des nouvelles données 
             const noteCell = cells[NOTE_INDEX];
             const experienceCell = cells[EXPERIENCE_INDEX];
             const prixMinCell = cells[PRIX_MIN_INDEX];
             const prixMaxCell = cells[PRIX_MAX_INDEX];
             const verifieGpsCell = cells[VERIFIE_GPS_INDEX];
+
 
             // Indices: [1]=Nom, [2]=Entreprise, [3]=Contact WhatsApp, [4]=Quartier, [5]=Ville
             return {
@@ -233,12 +249,14 @@ async function loadSheetData() {
                 secteur: secteurGeneral,
                 activite: activiteDetaillee, // La spécialité exacte
                 
-                // NOUVEAUX CHAMPS DE QUALITÉ
+                // NOUVEAUX CHAMPS DE QUALITÉ ET LOCALISATION
                 note: noteCell && noteCell.v !== null ? parseFloat(noteCell.v) : 0, // 0 par défaut
                 experience: experienceCell && experienceCell.v !== null ? parseInt(experienceCell.v) : 0, // 0 par défaut
                 verifie_gps: verifieGpsCell && verifieGpsCell.v ? verifieGpsCell.v.toUpperCase() === 'OUI' : false,
                 prix_min: prixMinCell && prixMinCell.v !== null ? parseFloat(prixMinCell.v) : null,
                 prix_max: prixMaxCell && prixMaxCell.v !== null ? parseFloat(prixMaxCell.v) : null,
+                latitude: cells[LATITUDE_INDEX] && cells[LATITUDE_INDEX].v !== null ? parseFloat(cells[LATITUDE_INDEX].v) : null,
+                longitude: cells[LONGITUDE_INDEX] && cells[LONGITUDE_INDEX].v !== null ? parseFloat(cells[LONGITUDE_INDEX].v) : null,
             };
         }).filter(item => item.activite.trim() !== ''); // N'inclut que les lignes ayant une activité réelle
 
@@ -270,10 +288,10 @@ function displayResults(results, activite, ville) {
             
             // Badges et Infos Qualité
             const noteEtoiles = pro.note > 0 ? getStarRating(pro.note) : '';
-            // Utilisation de la classe .badge-verified existante dans le CSS de l'utilisateur
             const badgeVerif = pro.verifie_gps ? `<span class="badge-verified ms-2">VÉRIFIÉ GPS</span>` : '';
             
-            const experience = pro.experience > 0 ? `Expérience : **${pro.experience} an(s)**` : 'Nouvelle adhésion';
+            // AFFICHAGE EXPÉRIENCE CORRIGÉ
+            const experience = pro.experience > 0 ? `${pro.experience} an(s)` : 'Nouvelle adhésion';
             
             let prixInfo = 'Non spécifié';
             if (pro.prix_min !== null && pro.prix_max !== null) {
@@ -282,16 +300,21 @@ function displayResults(results, activite, ville) {
                 prixInfo = `À partir de : ${formatFCFA(pro.prix_min)}`;
             }
 
+            // NOUVEAU: Lien de localisation (Visible si coordonnées et vérification OUI)
+            const mapLink = (pro.latitude && pro.longitude && pro.verifie_gps) ? 
+                `<a href="https://maps.google.com/?q=${pro.latitude},${pro.longitude}" target="_blank" class="location-link mt-2"><i class="bi bi-geo-alt-fill"></i> Voir l'adresse</a>` : '';
+
+
             responseHTML += `
                 <div class="result-card animated-result-card">
                     <p class="mb-0 text-white fw-bold d-flex align-items-center">${nomAffichage} ${badgeVerif}</p>
                     <p class="mb-1 text-accent small">${pro.activite} - ${pro.ville}${quartierInfo}</p>
-                    <div class="price-experience-line">
+                    <div class="note-line">
                         <div>${noteEtoiles}</div>
-                        <div class="experience-text">${experience}</div>
+                        <div class="experience-text">Expérience : <span>${experience}</span></div>
                     </div>
                     <p class="price-range">${prixInfo}</p>
-                    <a href="https://wa.me/${pro.contact.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
+                    ${mapLink} <a href="https://wa.me/${pro.contact.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
                         <i class="bi bi-whatsapp"></i> Contacter via WhatsApp
                     </a>
                 </div>
@@ -307,10 +330,9 @@ function displayResults(results, activite, ville) {
 
 
 // =====================================================================
-// NOUVELLE LOGIQUE DE GÉOLOCALISATION
+// LOGIQUE DE GÉOLOCALISATION
 // =====================================================================
 
-// NOUVELLE FONCTION : Gestion de la demande de géolocalisation
 function askForGeolocation(keyword) {
     const message = `
         <p>Pour trouver le(la) **${keyword}** le plus proche, j'ai besoin d'accéder à votre position actuelle.</p>
@@ -320,7 +342,6 @@ function askForGeolocation(keyword) {
     `;
     addMessage(message, 'bot');
 
-    // Les écouteurs d'événements doivent être ajoutés après l'insertion des boutons dans le DOM
     setTimeout(() => {
         const geoYesBtn = document.getElementById('geo-yes');
         const geoNoBtn = document.getElementById('geo-no');
@@ -339,7 +360,6 @@ function askForGeolocation(keyword) {
     }, 100);
 }
 
-// NOUVELLE FONCTION : Acquisition de la position GPS
 function getGeolocation(keyword) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
@@ -364,9 +384,7 @@ function getGeolocation(keyword) {
     }
 }
 
-// NOUVELLE FONCTION : Recherche Google Maps à proximité
 function searchNearby(keyword, location) {
-    // URL Google Maps pour une recherche centrée sur la position de l'utilisateur
     const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(keyword)}&query_place_id=&center=${location.lat},${location.lng}&zoom=15`;
 
     const responseHTML = `
