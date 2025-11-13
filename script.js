@@ -530,3 +530,4 @@ function searchProfessionals(query, activite, ville, degrade = false) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
+
