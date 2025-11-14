@@ -1,7 +1,7 @@
 // =====================================================================
 // ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
 // =====================================================================
-// NOUVEL ID DE FICHE GOOGLE : 1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk
+// ID DE FICHE GOOGLE : 1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
 // =====================================================================
 
@@ -20,11 +20,8 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU)
+// LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU) (Inchangées)
 // =====================================================================
-
-// NOTE: Ces listes ne sont pas utilisées pour la lecture des données de la feuille, mais pour la détection de mots-clés dans la requête utilisateur. 
-// Elles sont conservées telles quelles pour la logique existante.
 
 const SECTOR_COLUMNS = [
     'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
@@ -143,7 +140,7 @@ userInput.addEventListener('keypress', (e) => {
 
 
 // =====================================================================
-// FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES (Inchangées - logique conservée)
+// FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES (Logique conservée)
 // =====================================================================
 
 function getStarRating(note) {
@@ -207,12 +204,13 @@ async function loadSheetData() {
         const rows = data.table.rows;
         const headers = data.table.cols.map(col => col.label);
         
-        // --- MISE À JOUR : Mappage des indices de colonnes à partir des EN-TÊTES ---
+        // --- CORRECTION : Mappage des indices de colonnes à partir des EN-TÊTES EXACTS ---
+        // Utilisation de .includes() pour une meilleure robustesse face aux espaces/capitales invisibles
         const mapHeader = (headerName) => headers.findIndex(h => h.includes(headerName));
 
         const NOM_PRENOM_INDEX = mapHeader('Nom et Prénom');
         const ENTREPRISE_INDEX = mapHeader('Nom de l\'entreprise');
-        const CONTACT_INDEX = mapHeader('Numéro WhatsApp');
+        const CONTACT_INDEX = mapHeader('WhatsApp'); // CORRECTION ICI : Utilisation de 'WhatsApp'
         const VILLE_INDEX = mapHeader('Ville');
         const QUARTIER_INDEX = mapHeader('Votre quartier');
         const SECTEUR_INDEX = mapHeader('Secteur Général');
@@ -221,19 +219,9 @@ async function loadSheetData() {
         const PRIX_MIN_INDEX = mapHeader('Prix Min (FCFA)');
         const PRIX_MAX_INDEX = mapHeader('Prix Max (FCFA)');
         const NOTE_INDEX = mapHeader('Note/Avis');
-        const VISIBILITE_INDEX = mapHeader('Visibilité Publique'); // Utilisé comme 'Verifie_GPS' pour la logique existante
-        const GPS_INDICATION_INDEX = mapHeader('Indication GPS'); // Utilisé pour le lien
-
-        // NOTE: Les colonnes Latitude et Longitude NE SONT PLUS dans la feuille fournie.
-        // Nous allons donc utiliser la colonne 'Visibilité Publique' comme indicateur 
-        // de 'verifie_gps' (qui contrôle l'affichage du lien de localisation).
-        // La colonne 'Indication GPS (Lien ou Adresse)' sera lue pour le lien.
+        const VISIBILITE_INDEX = mapHeader('Visibilité Publique'); 
+        const GPS_INDICATION_INDEX = mapHeader('Indication GPS'); 
         
-        // La logique d'extraction de Latitude et Longitude est désactivée.
-        const LATITUDE_INDEX = -1; // Désactivé
-        const LONGITUDE_INDEX = -1; // Désactivé
-        // --------------------------------------------------------------------------
-
         const formattedData = rows.slice(1).map(row => {
             const cells = row.c;
             
@@ -275,11 +263,9 @@ async function loadSheetData() {
                 prix_min: prixMinValue !== null ? parseFloat(prixMinValue) : null,
                 prix_max: prixMaxValue !== null ? parseFloat(prixMaxValue) : null,
                 
-                // Ces valeurs sont nulles si les colonnes Latitude/Longitude n'existent pas ou sont vides
-                latitude: null, // Désactivé
-                longitude: null, // Désactivé
-                
-                // Nouveau: Stocker l'indication GPS brute pour l'affichage du lien (si VÉRIFIÉ = OUI)
+                // Champs GPS désactivés car non dans la feuille brute, mais stock du lien
+                latitude: null,
+                longitude: null,
                 gps_link: isVerified ? indicationGps : null,
             };
         }).filter(item => item.activite.trim() !== ''); // N'inclut que les lignes ayant une activité réelle
@@ -294,7 +280,7 @@ async function loadSheetData() {
 }
 
 
-// MISE À JOUR : Affichage des nouvelles informations (Modification du lien Google Maps)
+// MISE À JOUR : Affichage des nouvelles informations (Inchangée)
 function displayResults(results, activite, ville) {
     let responseHTML = '';
     const recherche = `**${activite || 'Professionnel'}** ${ville ? 'à **' + ville + '**' : ''}`;
@@ -324,7 +310,7 @@ function displayResults(results, activite, ville) {
                 prixInfo = `À partir de : ${formatFCFA(pro.prix_min)}`;
             }
 
-            // NOUVEAU: Utiliser la colonne gps_link (Indication GPS) pour le lien si 'verifie_gps' est VRAI
+            // Utiliser la colonne gps_link (Indication GPS) pour le lien si 'verifie_gps' est VRAI
             const mapLink = (pro.gps_link && pro.verifie_gps) ? 
                 `<a href="${pro.gps_link}" target="_blank" class="location-link mt-2"><i class="bi bi-geo-alt-fill"></i> Voir l'adresse</a>` : '';
 
@@ -354,7 +340,7 @@ function displayResults(results, activite, ville) {
 
 
 // =====================================================================
-// LOGIQUE DE GÉOLOCALISATION (Inchangée)
+// LOGIQUE DE GÉOLOCALISATION
 // =====================================================================
 
 function askForGeolocation(keyword) {
@@ -409,7 +395,7 @@ function getGeolocation(keyword) {
 }
 
 function searchNearby(keyword, location) {
-    // Correction de l'URL pour une recherche Google Maps normale
+    // Correction de l'URL pour une recherche Google Maps
     const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(keyword)}/@${location.lat},${location.lng},15z`;
 
     const responseHTML = `
@@ -555,4 +541,3 @@ function searchProfessionals(query, activite, ville, degrade = false) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
-
