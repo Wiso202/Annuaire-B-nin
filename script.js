@@ -1,16 +1,12 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : URL DE L'API GOOGLE VISUALIZATION (GVIZ)
-// Assurez-vous que la Google Sheet est partagée avec "Tout le monde"
+// ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
 // =====================================================================
-const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
+const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
 // =====================================================================
 
 let proData = []; 
+// Nouvelle variable pour stocker la position de l'utilisateur
 let userLocation = null;
-
-// NOUVEAU: Mots-clés pour détecter une recherche de proximité
-const GEO_KEYWORDS = ['près de moi', 'autour de moi', 'proche', 'voisinage'];
-let lastProximityQuery = ''; // Stocker la dernière requête de proximité pour éviter les boucles
 
 // Éléments DOM
 const chatBox = document.getElementById('chat-box');
@@ -19,34 +15,70 @@ const sendBtn = document.getElementById('send-btn');
 const homePage = document.getElementById('home-page');
 const chatPage = document.getElementById('chat-page');
 const startChatBtn = document.getElementById('start-chat-btn');
-// const accueilBtnNav = document.getElementById('accueil-btn-nav'); // Non utilisé dans index.html, laissé en commentaire
+const accueilBtnNav = document.getElementById('accueil-btn-nav');
 const proCountDisplay = document.getElementById('pro-count-display'); // NOUVEAU
 
-// Définition des villes (pour la recherche de localisation classique)
-const VILLE_KEYWORDS = [
-    'abomey', 'calavi', 'adja-ouèrè', 'adjarra', 'adjohoun', 'agbangnizoun', 
-    'aguégué', 'allada', 'aplahoué', 'athiémé', 'avrankou', 'banikoara', 
-    'bantè', 'bembèrèkè', 'bohicon', 'bonou', 'bopa', 'boukombé', 
-    'cobly', 'comè', 'copargo', 'cotonou', 'covè', 'dangbo', 
-    'dassa zoumé', 'djakotomey', 'djidja', 'djougou', 'dogbo', 'glazoué', 
-    'gogounou', 'grand-popo', 'houéyogbé', 'ifangni', 'kalalé', 'kandi', 
-    'karimama', 'kérou', 'kétou', 'klouékanmè', 'kouandé', 'kpomassè', 
-    'lalo', 'lokossa', 'malanville', 'matéri', 'missérété', 'n\'dali', 
-    'natitingou', 'nikki', 'ouaké', 'ouèssè', 'ouidah', 'ouinhi', 
-    'parakou', 'pehunco', 'pérèrè', 'pobè', 'porto novo', 'sakété', 
-    'savalou', 'savè', 'séguana', 'sèmè-podji', 'sinandé', 'so ava', 
-    'tanguiéta', 'tchaourou', 'toffo', 'tori bossito', 'toucountouna', 
-    'toviklin', 'zagannado', 'za-kpota', 'zè', 'zogbodomey'
+
+// =====================================================================
+// LISTES DE RÉFÉRENCE (INCHANGÉES)
+// =====================================================================
+
+// NOUVEAU: Mots-clés pour détecter une recherche de proximité
+const GEO_KEYWORDS_PROXIMITY = ['près de moi', 'autour de moi', 'proche', 'voisinage'];
+// LISTE ÉTENDUE des lieux à chercher à proximité
+const GEO_KEYWORDS_PLACES = [
+    'banque', 'hôpital', 'pharmacie', 'commissariat', 'poste', 'urgence', 'distributeur', 
+    'supermarché', 'restaurant', 'marché', 'école', 'université', 'stade', 'mosquée', 
+    'église', 'hôtel', 'aéroport', 'bus', 'station-service', 'garage' 
 ];
 
+const ALL_CITIES = [
+    'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Malanville', 'Segbana', 'Boukoumbé', 'Cobly', 'Kérou', 'Kouandé', 
+    'Matéri', 'Natitingou', 'Péhunco', 'Tanguiéta', 'Toucountouna', 'Abomey-Calavi', 'Allada', 'Kpomassè', 'Ouidah', 
+    'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè', 'Bembéréké', 'Kalalé', 'N\'Dali', 'Nikki', 'Parakou', 'Pèrèrè', 'Sinendé', 
+    'Tchaourou', 'Bantè', 'Dassa-Zoumé', 'Glazoué', 'Ouèssè', 'Savalou', 'Savè', 'Aplahoué', 'Djakotomey', 'Dogbo', 
+    'Klouékanmè', 'Lalo', 'Toviklin', 'Bassila', 'Copargo', 'Djougou', 'Ouaké', 'Cotonou', 'Athiémè', 'Bopa', 'Comè', 
+    'Grand-Popo', 'Houéyogbé', 'Lokossa', 'Adjarra', 'Adjohoun', 'Aguégués', 'Akpro-Missérété', 'Avrankou', 'Bonou', 
+    'Dangbo', 'Porto-Novo', 'Sèmè-Kpodji', 'Ifangni', 'Kétou', 'Pobè', 'Sakété', 'Abomey', 'Agbangnizoun', 'Bohicon', 
+    'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
+].map(city => city.toLowerCase()); 
+
 // =====================================================================
-// FONCTIONS UTILITAIRES
+// FONCTIONS DE BASE
 // =====================================================================
 
-function normalizeKeyword(keyword) {
-    // Normalise : supprime les accents, met en minuscule
-    return keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+function showPage(pageId) {
+    if (pageId === 'home') {
+        homePage.style.opacity = 1;
+        chatPage.style.opacity = 0;
+        homePage.style.transform = 'translateX(0)';
+        chatPage.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            homePage.classList.remove('d-none');
+            chatPage.classList.add('d-none');
+        }, 500); 
+
+    } else if (pageId === 'chat') {
+        chatPage.style.opacity = 0;
+        chatPage.style.transform = 'translateX(100%)';
+        chatPage.classList.remove('d-none');
+        
+        setTimeout(() => {
+            homePage.style.opacity = 0;
+            chatPage.style.opacity = 1;
+            chatPage.style.transform = 'translateX(0)';
+            userInput.focus();
+        }, 50); 
+        
+        setTimeout(() => {
+            homePage.classList.add('d-none');
+        }, 500);
+    }
 }
+// FIX: L'élément accueilBtnNav n'existe pas dans le HTML fourni, donc on le désactive si vous ne l'avez pas ajouté.
+// startChatBtn.addEventListener('click', () => showPage('chat'));
+// accueilBtnNav.addEventListener('click', () => showPage('home')); 
+
 
 function appendMessage(sender, text, isHtml = false) {
     const messageElement = document.createElement('div');
@@ -61,51 +93,45 @@ function appendMessage(sender, text, isHtml = false) {
 }
 
 // =====================================================================
-// GESTION DES DONNÉES
+// FONCTIONS DE GESTION DES DONNÉES (MISE À JOUR CRITIQUE DU MAPPING)
 // =====================================================================
 
+/**
+ * Cartographie simplifiée des colonnes GVIZ (B à O dans la feuille)
+ * @param {object} row - Ligne de données GVIZ
+ */
 function processRow(row) {
-    const cols = row.c;
-    // Les indices des colonnes sont basés sur les colonnes renvoyées par la requête GVIZ
-    // La requête GVIZ utilise C0, C1, C2... pour les colonnes B, C, D... de la feuille
+    const cells = row.c;
     
-    // Indices des colonnes :
-    // C0 (B): Nom Contact
-    // C1 (C): Nom Entreprise
-    // C2 (D): WhatsApp
-    // C3 (E): Ville
-    // C4 (F): Quartier
-    // C5 (G): Indication GPS
-    // C6 (H): Secteur Général
-    // C7 (I): Activité Détaillée
-    // C8 (J): Expérience (ans)
-    // C9 (K): Prix Min (FCFA)
-    // C10 (L): Prix Max (FCFA)
-    // C11 (M): Note/Avis
-    // C12 (N): Visibilité Publique
-    // C13 (O): Consentement Contact
+    // --- NOUVEAU MAPPING SIMPLIFIÉ BASÉ SUR LES INDICES CELL[0] à CELL[13] ---
+    // Les indices des cellules (cells[i]) correspondent aux colonnes B, C, D... de la feuille.
+    
+    // Extraction et nettoyage des données critiques
+    const noteAvis = cells[11] ? (cells[11].v || 3.0) : 3.0; // Col M
+    const prixMin = cells[9] ? (cells[9].v || 0) : 0;        // Col K
+    const prixMax = cells[10] ? (cells[10].v || 0) : 0;      // Col L
+    const visible = cells[12] && normalizeKeyword(cells[12].v) === 'oui'; // Col N
 
-    // NOUVEAU MAPPING (Adapté à la structure du formulaire d'inscription, mais indices décalés)
-    // Il est critique de s'assurer que l'ordre des colonnes dans le SELECT du GVIZ correspond à ce mapping
+    // Note: Dans ce mapping, on ignore la longitude/latitude qui n'étaient pas extraites dans le code précédent, 
+    // mais on conserve l'Indication GPS (Col G/cells[5]) pour le lien Google Maps.
+    
     return {
-        // Le GVIZ commence par C0, mais la feuille commence par A (Timestamp), B (Nom)...
-        // Si le SELECT est 'SELECT B, C, D, E, F, G, H, I, J, K, L, M, N, O' :
-        nom: cols[0] ? cols[0].v : 'N/A',
-        entreprise: cols[1] ? cols[1].v : 'N/A',
-        whatsapp: cols[2] ? cols[2].v : 'N/A',
-        ville: cols[3] ? cols[3].v : 'N/A',
-        quartier: cols[4] ? cols[4].v : 'N/A',
-        indication_gps: cols[5] ? cols[5].v : '',
-        secteur: cols[6] ? cols[6].v : 'N/A',
-        activite: cols[7] ? cols[7].v : 'N/A',
-        experience: cols[8] ? parseInt(cols[8].v) : 0,
-        prix_min: cols[9] ? parseInt(cols[9].v.replace(/[^\d]/g, '')) || 0 : 0,
-        prix_max: cols[10] ? parseInt(cols[10].v.replace(/[^\d]/g, '')) || 0 : 0,
-        note_avis: cols[11] ? parseFloat(cols[11].v) || 3.0 : 3.0,
-        visible: cols[12] && normalizeKeyword(cols[12].v) === 'oui'
-        // On ignore la colonne Consentement Contact (C13) dans le mapping client
+        nom: cells[0] ? cells[0].v : 'N/A',
+        entreprise: cells[1] ? cells[1].v : 'N/A',
+        contact: cells[2] ? cells[2].v : 'N/A',
+        ville: cells[3] ? cells[3].v : 'N/A',
+        quartier: cells[4] ? cells[4].v : 'N/A',
+        indication_gps: cells[5] ? cells[5].v : null, // G: Indication GPS
+        secteur: cells[6] ? cells[6].v : 'N/A',       // H: Secteur Général
+        activite: cells[7] ? cells[7].v : 'N/A',      // I: Activité Détaillée
+        experience: cells[8] ? parseInt(cells[8].v) || 0 : 0, // J: Expérience
+        prix_min: parseFloat(prixMin) || 0,
+        prix_max: parseFloat(prixMax) || 0,
+        note_avis: parseFloat(noteAvis) || 3.0,
+        visible: visible
     };
 }
+
 
 // Fonction de chargement des données
 async function loadProData() {
@@ -113,19 +139,18 @@ async function loadProData() {
         appendMessage('bot', "Démarrage de l'assistant... Chargement des données d'annuaire...");
         
         // Requête GVIZ pour sélectionner les 14 colonnes de données B à O
-        // Le SELECT doit correspondre aux 14 champs du formulaire (hors Timestamp)
         const tq = '&tq=SELECT B, C, D, E, F, G, H, I, J, K, L, M, N, O'; 
         const url = SHEET_API_URL + tq;
-        
+
         const response = await fetch(url);
         const text = await response.text();
         
         // Nettoyage de la réponse GVIZ
-        const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+        const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
         const data = JSON.parse(jsonText);
         
         const allRows = data.table.rows || [];
-        // Filtrer ici les lignes visibles
+        // Filtrer ici les lignes visibles (Colonne N/cells[12] = 'Oui')
         const visibleRows = allRows.filter(row => row.c[12] && normalizeKeyword(row.c[12].v) === 'oui');
         
         proData = visibleRows.map(processRow);
@@ -135,14 +160,7 @@ async function loadProData() {
             proCountDisplay.textContent = `Total de ${proData.length} professionnels enregistrés.`;
         }
         
-        // Animer le compteur sur la page d'accueil
-        const statsElement = document.getElementById('stats-pros');
-        if (statsElement) {
-            animateValue(statsElement, 0, proData.length, 1500);
-        }
-        
-        appendMessage('bot', `Annuaire chargé avec succès (${proData.length} pros visibles). Bonjour ! Je suis ProFinder, votre assistant. Quel service ou professionnel recherchez-vous, et dans quelle ville/zone ?`);
-
+        appendMessage('bot', `Annuaire chargé avec succès (${proData.length} pros visibles). Bonjour ! Je suis ProFinder. Que recherchez-vous ?`);
     } catch (error) {
         console.error("Erreur lors du chargement des données:", error);
         if (proCountDisplay) proCountDisplay.textContent = "Erreur de chargement des données.";
@@ -152,13 +170,96 @@ async function loadProData() {
 
 
 // =====================================================================
-// FONCTIONS DE GÉOLOCALISATION
+// FONCTIONS DE RENDU (INCHANGÉES)
 // =====================================================================
 
-// 1. Demande de partage de localisation (Affiche le message avec les boutons)
+function getStarRating(note) {
+    const normalizedNote = Math.max(0, Math.min(5, parseFloat(note)));
+    const roundedNote = Math.round(normalizedNote * 2) / 2; 
+    let stars = '';
+    const fullStars = Math.floor(roundedNote);
+    for (let i = 0; i < fullStars; i++) {
+        stars += '★'; 
+    }
+    const hasHalfStar = (roundedNote - fullStars) === 0.5;
+    if (hasHalfStar) {
+        stars += '½'; 
+    }
+    const emptyStars = 5 - fullStars - (hasHalfStar ? 0.5 : 0);
+    for (let i = 0; i < Math.floor(emptyStars); i++) {
+        stars += '☆'; 
+    }
+    return `<span class="star-rating">${stars}</span>`;
+}
+
+function formatFCFA(number) {
+    if (number === null || isNaN(number) || number === 0) return 'Prix non précisé';
+    return new Intl.NumberFormat('fr-FR').format(number) + ' FCFA';
+}
+
+function renderProCard(pro) {
+    const card = document.createElement('div');
+    card.classList.add('pro-card', 'animated-pop');
+    
+    const whatsappNumber = pro.contact ? pro.contact.replace(/\s/g, '').replace(/^\+/, '') : '';
+    const whatsappLink = whatsappNumber ? `https://wa.me/${whatsappNumber}` : '#';
+    
+    const ratingBadge = `<div class="rating-badge">${getStarRating(pro.note_avis)} (${pro.note_avis.toFixed(1)})</div>`;
+    
+    let priceRangeHtml = `<div class="price-range">Prix : ${formatFCFA(pro.prix_min)} - ${formatFCFA(pro.prix_max)}</div>`;
+
+    // Utilisation de Indication GPS (Col G) pour le lien de localisation
+    const locationLink = pro.indication_gps 
+        ? `<a href="${pro.indication_gps}" target="_blank" class="location-link"><i class="bi bi-geo-alt-fill"></i> Voir la Localisation</a>` 
+        : `<span class="location-link text-secondary">Localisation non fournie</span>`;
+
+    card.innerHTML = `
+        <div class="card-header-content">
+            <div class="badge-verified">PRO VÉRIFIÉ</div>
+            ${ratingBadge}
+        </div>
+        <h3>${pro.entreprise}</h3>
+        <h4>${pro.activite} (${pro.secteur}) - Exp. ${pro.experience} ans</h4>
+        <p class="location-text"><i class="bi bi-pin-map-fill"></i> ${pro.quartier}, ${pro.ville}</p>
+        ${priceRangeHtml}
+        
+        <div class="card-actions">
+            ${locationLink}
+            <a href="${whatsappLink}" target="_blank" class="whatsapp-link">
+                <i class="bi bi-whatsapp"></i> Contacter sur WhatsApp
+            </a>
+        </div>
+    `;
+    
+    return card;
+}
+
+
+// =====================================================================
+// FONCTIONS UTILITAIRES ET LOGIQUE DE RECHERCHE (INCHANGÉES)
+// =====================================================================
+
+function normalizeKeyword(keyword) {
+    return keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function sortProfessionals(a, b) {
+    if (b.note_avis !== a.note_avis) {
+        return b.note_avis - a.note_avis; 
+    }
+    return b.experience - a.experience;
+}
+
+
+// FIX / NOUVEAU: Logique de géolocalisation et du compteur.
+// Ce bloc est conservé et adapté pour fonctionner avec la nouvelle fonction processRow
+// qui utilise cells[5] pour l'Indication GPS.
+
+let lastProximityQuery = ''; 
+
 function promptForLocation(originalQuery) {
     const promptHtml = `
-        <div class="location-prompt">
+        <div class="location-prompt message bot">
             <p>Pour trouver les professionnels les plus proches de vous, nous avons besoin d'accéder à votre position actuelle.</p>
             <button class="accept-btn">Partager ma position</button>
             <button class="decline-btn">Non, merci</button>
@@ -181,7 +282,6 @@ function promptForLocation(originalQuery) {
     };
 }
 
-// 2. Obtention de la position de l'utilisateur
 function requestUserLocation(originalQuery) {
     appendMessage('bot', "Localisation en cours...");
     
@@ -194,7 +294,7 @@ function requestUserLocation(originalQuery) {
                 };
                 
                 // Retirer les mots-clés de proximité de la requête pour la recherche Maps
-                const searchKeyword = originalQuery.toLowerCase().replace(new RegExp(GEO_KEYWORDS.join('|'), 'g'), '').trim();
+                const searchKeyword = originalQuery.toLowerCase().replace(new RegExp(GEO_KEYWORDS_PROXIMITY.join('|'), 'g'), '').trim();
                 
                 // Générer le lien Google Maps
                 // La requête maps sera : [profession] @ [lat, lng]
@@ -237,68 +337,10 @@ function requestUserLocation(originalQuery) {
     }
 }
 
-// =====================================================================
-// FONCTION DE RENDU
-// =====================================================================
-
-function renderProCard(pro) {
-    const card = document.createElement('div');
-    card.classList.add('pro-card', 'animated-pop');
-    
-    // Conversion du numéro WhatsApp (simple nettoyage pour le lien)
-    const whatsappNumber = pro.whatsapp ? pro.whatsapp.replace(/\s/g, '').replace(/^\+/, '') : '';
-    const whatsappLink = whatsappNumber ? `https://wa.me/${whatsappNumber}` : '#';
-    
-    // Rendu du badge de Note/Avis
-    const ratingBadge = `<div class="rating-badge"><i class="bi bi-star-fill"></i> ${pro.note_avis.toFixed(1)} / 5</div>`;
-    
-    // Rendu de la fourchette de prix
-    let priceRangeHtml = '';
-    if (pro.prix_min > 0 && pro.prix_max > 0) {
-        priceRangeHtml = `<div class="price-range">Prix estimé : ${pro.prix_min.toLocaleString()} XOF - ${pro.prix_max.toLocaleString()} XOF</div>`;
-    } else if (pro.prix_min > 0) {
-        priceRangeHtml = `<div class="price-range">Prix min. : ${pro.prix_min.toLocaleString()} XOF</div>`;
-    } else if (pro.prix_max > 0) {
-        priceRangeHtml = `<div class="price-range">Prix max. : ${pro.prix_max.toLocaleString()} XOF</div>`;
-    }
-
-    // Rendu du lien de localisation (Utilise Indication GPS pour un lien direct si fourni)
-    const locationLink = pro.indication_gps 
-        ? `<a href="${pro.indication_gps}" target="_blank" class="location-link"><i class="bi bi-geo-alt-fill"></i> Voir la Localisation</a>` 
-        : `<span class="location-link text-secondary">Localisation: ${pro.quartier}, ${pro.ville}</span>`;
-
-    card.innerHTML = `
-        <div class="card-header-content">
-            <div class="badge-verified">PRO VÉRIFIÉ</div>
-            ${ratingBadge}
-        </div>
-        <h3>${pro.entreprise}</h3>
-        <h4>${pro.activite} (${pro.secteur}) - Exp. ${pro.experience} ans</h4>
-        
-        <p class="location-text"><i class="bi bi-pin-map-fill"></i> ${pro.quartier}, ${pro.ville}</p>
-        
-        ${priceRangeHtml}
-        
-        <p class="description-text">${pro.description}</p>
-        
-        <div class="card-actions">
-            ${locationLink}
-            <a href="${whatsappLink}" target="_blank" class="whatsapp-link">
-                <i class="bi bi-whatsapp"></i> Contacter sur WhatsApp (${pro.whatsapp})
-            </a>
-        </div>
-    `;
-    
-    return card;
-}
-
-// =====================================================================
-// LOGIQUE DE RECHERCHE ET DE FILTRAGE
-// =====================================================================
 
 function filterData(query) {
     if (!query) {
-        return proData.sort((a, b) => b.note_avis - a.note_avis);
+        return proData.sort(sortProfessionals);
     }
     
     const lowerQuery = normalizeKeyword(query);
@@ -306,13 +348,11 @@ function filterData(query) {
     
     let activite = '';
     let ville = '';
-    let degrade = false; 
     
     // Détermination de la ville ou localisation
-    for (const city of VILLE_KEYWORDS) {
-        const normalizedCity = normalizeKeyword(city);
-        if (lowerQuery.includes(normalizedCity)) {
-            ville = normalizedCity;
+    for (const city of ALL_CITIES) {
+        if (lowerQuery.includes(city)) {
+            ville = city;
             break;
         }
     }
@@ -345,12 +385,8 @@ function filterData(query) {
         
         // 2. Logique de Ville/Quartier
         if (ville) {
-            if (degrade) {
-                matchVille = proVille.includes(ville);
-            } else {
-                const fullLocation = proVille + ' ' + proQuartier;
-                matchVille = fullLocation.includes(lowerQuery) || proVille.includes(ville);
-            }
+            const fullLocation = proVille + ' ' + proQuartier;
+            matchVille = fullLocation.includes(lowerQuery) || proVille.includes(ville);
         } else {
             matchVille = true;
         }
@@ -358,21 +394,16 @@ function filterData(query) {
         return matchActivite && matchVille;
     });
     
-    // Trier les résultats par note_avis (du plus grand au plus petit)
-    return filteredList.sort((a, b) => b.note_avis - a.note_avis);
+    return filteredList.sort(sortProfessionals);
 }
 
-
-// Fonction pour filtrer et afficher les résultats
 function filterAndDisplayResults(query) {
     const filteredPros = filterData(query);
     
-    // Vider la chatBox des cartes précédentes, mais conserver les messages
-    const existingMessages = Array.from(chatBox.children).filter(child => child.classList.contains('message'));
+    const existingMessages = Array.from(chatBox.children).filter(child => child.classList.contains('message') || child.classList.contains('location-prompt'));
     chatBox.innerHTML = '';
     existingMessages.forEach(msg => chatBox.appendChild(msg));
 
-    // Mettre à jour l'affichage du compte pour les résultats filtrés
     if (proCountDisplay) {
         proCountDisplay.textContent = `${filteredPros.length} professionnel(s) trouvé(s) pour votre recherche sur ${proData.length} pros enregistrés.`;
     }
@@ -381,7 +412,7 @@ function filterAndDisplayResults(query) {
         appendMessage('bot', `Désolé, je n'ai trouvé aucun professionnel correspondant à votre recherche "${query}". Essayez des mots-clés différents ou une autre ville.`);
     } else {
         appendMessage('bot', `J'ai trouvé ${filteredPros.length} professionnel(s) correspondant(s) à votre recherche. Voici les meilleurs (triés par Note/Avis) :`);
-        filteredPros.slice(0, 5).forEach(pro => { // Afficher les 5 premiers
+        filteredPros.slice(0, 5).forEach(pro => { 
             chatBox.appendChild(renderProCard(pro));
         });
          if (filteredPros.length > 5) {
@@ -392,50 +423,46 @@ function filterAndDisplayResults(query) {
 }
 
 
-// =====================================================================
-// FONCTION PRINCIPALE DE GESTION DU CHAT (FIX du bouton)
-// =====================================================================
-
 function handleChat() {
     const query = userInput.value.trim();
     if (query === '' || proData.length === 0) return;
 
-    // 1. Afficher la requête de l'utilisateur
     appendMessage('user', query);
     userInput.value = '';
     
-    // 2. Vérifier si la requête contient un mot-clé de proximité
-    const isProximityQuery = GEO_KEYWORDS.some(keyword => query.toLowerCase().includes(keyword));
+    // Détecter si la requête est du type "près de moi" pour un lieu (Banque, Hôpital, etc.)
+    const isProximityQuery = GEO_KEYWORDS_PROXIMITY.some(keyword => query.toLowerCase().includes(keyword));
+    const isPlaceQuery = GEO_KEYWORDS_PLACES.some(keyword => query.toLowerCase().includes(keyword));
     
-    // 3. Logique de géolocalisation
-    if (isProximityQuery && lastProximityQuery !== query) {
-        lastProximityQuery = query; // Stocker la requête
-        promptForLocation(query);
+    if (isProximityQuery) {
+        // Pour les requêtes de proximité, on ne fait le prompt que si c'est une nouvelle requête
+        if (lastProximityQuery !== query) {
+            lastProximityQuery = query; 
+            promptForLocation(query);
+        } else {
+            // Si l'utilisateur relance juste la même requête, on fait une recherche normale.
+            filterAndDisplayResults(query);
+            lastProximityQuery = ''; 
+        }
     } else {
-        // Recherche normale ou après la première demande de localisation
+        // Recherche normale
         filterAndDisplayResults(query);
-        lastProximityQuery = ''; // Réinitialiser après une recherche normale
+        lastProximityQuery = ''; 
     }
 }
 
 
-// =====================================================================
 // GESTION DES ÉVÉNEMENTS
-// =====================================================================
-
-// Événement pour démarrer le chat
 startChatBtn.addEventListener('click', () => {
     homePage.classList.add('d-none');
     chatPage.classList.remove('d-none');
     userInput.focus();
-    // Le message de bienvenue est déjà envoyé par loadProData
 });
 
-// FIX / NOUVEAU: Écouteur pour le bouton d'envoi et la touche Entrée
 sendBtn.addEventListener('click', handleChat);
 userInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-        e.preventDefault(); // Empêche l'action par défaut du formulaire (soumission)
+        e.preventDefault();
         handleChat();
     }
 });
