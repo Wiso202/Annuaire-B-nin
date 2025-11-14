@@ -20,11 +20,11 @@ const proCountDisplay = document.getElementById('pro-count-display'); // NOUVEAU
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE (INCHANGÉES)
+// LISTES DE RÉFÉRENCE (CORRIGÉES POUR LA PROXIMITÉ)
 // =====================================================================
 
 // NOUVEAU: Mots-clés pour détecter une recherche de proximité
-const GEO_KEYWORDS_PROXIMITY = ['près de moi', 'autour de moi', 'proche', 'voisinage'];
+const GEO_KEYWORDS_PROXIMITY = ['près de moi', 'autour de moi', 'proche', 'voisinage', 'à côté'];
 // LISTE ÉTENDUE des lieux à chercher à proximité
 const GEO_KEYWORDS_PLACES = [
     'banque', 'hôpital', 'pharmacie', 'commissariat', 'poste', 'urgence', 'distributeur', 
@@ -44,7 +44,7 @@ const ALL_CITIES = [
 ].map(city => city.toLowerCase()); 
 
 // =====================================================================
-// FONCTIONS DE BASE
+// FONCTIONS DE BASE ET MESSAGE (UNIFIÉES)
 // =====================================================================
 
 function showPage(pageId) {
@@ -75,14 +75,12 @@ function showPage(pageId) {
         }, 500);
     }
 }
-// FIX: L'élément accueilBtnNav n'existe pas dans le HTML fourni, donc on le désactive si vous ne l'avez pas ajouté.
-// startChatBtn.addEventListener('click', () => showPage('chat'));
-// accueilBtnNav.addEventListener('click', () => showPage('home')); 
 
-
+// L'ancienne fonction 'appendMessage' est conservée et simplifiée
 function appendMessage(sender, text, isHtml = false) {
     const messageElement = document.createElement('div');
-    messageElement.classList.add('message', sender);
+    messageElement.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message', 'animated-message');
+    
     if (isHtml) {
         messageElement.innerHTML = text;
     } else {
@@ -92,29 +90,22 @@ function appendMessage(sender, text, isHtml = false) {
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
+
 // =====================================================================
 // FONCTIONS DE GESTION DES DONNÉES (MISE À JOUR CRITIQUE DU MAPPING)
 // =====================================================================
 
-/**
- * Cartographie simplifiée des colonnes GVIZ (B à O dans la feuille)
- * @param {object} row - Ligne de données GVIZ
- */
+// La fonction processRow (mapping des colonnes) est conservée telle quelle car elle était la dernière bonne version.
 function processRow(row) {
     const cells = row.c;
     
-    // --- NOUVEAU MAPPING SIMPLIFIÉ BASÉ SUR LES INDICES CELL[0] à CELL[13] ---
-    // Les indices des cellules (cells[i]) correspondent aux colonnes B, C, D... de la feuille.
+    // NOUVEAU MAPPING SIMPLIFIÉ BASÉ SUR LES INDICES CELL[0] à CELL[13] (Colonnes B à O)
     
-    // Extraction et nettoyage des données critiques
     const noteAvis = cells[11] ? (cells[11].v || 3.0) : 3.0; // Col M
     const prixMin = cells[9] ? (cells[9].v || 0) : 0;        // Col K
     const prixMax = cells[10] ? (cells[10].v || 0) : 0;      // Col L
     const visible = cells[12] && normalizeKeyword(cells[12].v) === 'oui'; // Col N
 
-    // Note: Dans ce mapping, on ignore la longitude/latitude qui n'étaient pas extraites dans le code précédent, 
-    // mais on conserve l'Indication GPS (Col G/cells[5]) pour le lien Google Maps.
-    
     return {
         nom: cells[0] ? cells[0].v : 'N/A',
         entreprise: cells[1] ? cells[1].v : 'N/A',
@@ -133,7 +124,7 @@ function processRow(row) {
 }
 
 
-// Fonction de chargement des données
+// Fonction de chargement des données (inchangée)
 async function loadProData() {
     try {
         appendMessage('bot', "Démarrage de l'assistant... Chargement des données d'annuaire...");
@@ -155,7 +146,6 @@ async function loadProData() {
         
         proData = visibleRows.map(processRow);
         
-        // NOUVEAU : Afficher le nombre total de professionnels après le chargement
         if (proCountDisplay) {
             proCountDisplay.textContent = `Total de ${proData.length} professionnels enregistrés.`;
         }
@@ -170,7 +160,7 @@ async function loadProData() {
 
 
 // =====================================================================
-// FONCTIONS DE RENDU (INCHANGÉES)
+// FONCTIONS DE RENDU (CORRECTION MINEURE)
 // =====================================================================
 
 function getStarRating(note) {
@@ -197,6 +187,9 @@ function formatFCFA(number) {
     return new Intl.NumberFormat('fr-FR').format(number) + ' FCFA';
 }
 
+/**
+ * Rendu de la carte du professionnel (Retourne un élément DIV .pro-card)
+ */
 function renderProCard(pro) {
     const card = document.createElement('div');
     card.classList.add('pro-card', 'animated-pop');
@@ -236,28 +229,110 @@ function renderProCard(pro) {
 
 
 // =====================================================================
-// FONCTIONS UTILITAIRES ET LOGIQUE DE RECHERCHE (INCHANGÉES)
+// FONCTIONS UTILITAIRES ET LOGIQUE DE RECHERCHE (CORRIGÉES)
 // =====================================================================
 
+/**
+ * Normalise les mots-clés (retire accents, passe en minuscule, retire espace)
+ */
 function normalizeKeyword(keyword) {
-    return keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    if (!keyword) return '';
+    return keyword.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 function sortProfessionals(a, b) {
     if (b.note_avis !== a.note_avis) {
-        return b.note_avis - a.note_avis; 
+        return b.note_avis - a.note_avis;
     }
     return b.experience - a.experience;
 }
 
+/**
+ * Parse la requête utilisateur pour extraire activité et ville.
+ */
+function parseQuery(query) {
+    const lowerQuery = normalizeKeyword(query);
+    let activite = '';
+    let ville = '';
 
-// FIX / NOUVEAU: Logique de géolocalisation et du compteur.
-// Ce bloc est conservé et adapté pour fonctionner avec la nouvelle fonction processRow
-// qui utilise cells[5] pour l'Indication GPS.
+    // 1. Détection de la Ville (la plus longue en premier pour éviter les faux positifs)
+    const sortedCities = ALL_CITIES.sort((a, b) => b.length - a.length);
+    for (const city of sortedCities) {
+        if (lowerQuery.includes(city)) {
+            ville = city;
+            // Retirer la ville et les prépositions de la requête pour isoler l'activité
+            let tempQuery = lowerQuery.replace(city, '').trim();
+            activite = tempQuery.replace(/à|près de|autour de|en|dans|de/g, '').trim();
+            break;
+        }
+    }
+    
+    // 2. Si aucune ville n'est trouvée, l'activité est l'ensemble de la requête nettoyée.
+    if (!ville) {
+        // Tente de décomposer la requête simple 'activité à ville' ou juste l'activité
+        const parts = lowerQuery.split(/à |près de |autour de |en |dans |de /);
+        if (parts.length > 0) {
+            activite = parts[0].trim();
+        } else {
+            activite = lowerQuery;
+        }
+    }
+
+    // Si l'activité est trop courte, ignorer l'activité (pour forcer la recherche par ville/mots-clés seulement)
+    if (activite.length < 3) activite = '';
+    
+    return { activite, ville, lowerQuery };
+}
+
+/**
+ * CORRECTION CRITIQUE: Logique de filtrage des données
+ */
+function filterData(query) {
+    if (!query) {
+        return proData.sort(sortProfessionals);
+    }
+    
+    const { activite, ville, lowerQuery } = parseQuery(query);
+    // Créer une liste de mots-clés normalisés pour une recherche plus flexible
+    const queryWords = lowerQuery.split(/[\\s,;']+/).filter(w => w.length > 2).map(normalizeKeyword); 
+    
+    let filteredList = proData.filter(pro => {
+        let matchActivite = false;
+        let matchVille = false;
+        
+        // Normaliser les données du professionnel pour la comparaison
+        const proActivite = normalizeKeyword(pro.activite);
+        const proSecteur = normalizeKeyword(pro.secteur);
+        const proVille = normalizeKeyword(pro.ville);
+        // const proQuartier = normalizeKeyword(pro.quartier); // Quartier est moins fiable
+
+        // 1. Logique d'Activité
+        if (activite) {
+            // Correspondance sur l'activité principale OU le secteur général OU les mots-clés de la requête
+            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
+                            queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
+        } else {
+            matchActivite = true; // Si pas d'activité spécifique demandée, on ne filtre pas sur l'activité
+        }
+        
+        // 2. Logique de Ville/Localisation
+        if (ville) {
+            matchVille = proVille.includes(ville);
+        } else {
+            matchVille = true; // Si pas de ville demandée, on ne filtre pas sur la ville
+        }
+        
+        return matchActivite && matchVille;
+    });
+    
+    return filteredList.sort(sortProfessionals);
+}
+
 
 let lastProximityQuery = ''; 
 
 function promptForLocation(originalQuery) {
+    // ... (inchangée)
     const promptHtml = `
         <div class="location-prompt message bot">
             <p>Pour trouver les professionnels les plus proches de vous, nous avons besoin d'accéder à votre position actuelle.</p>
@@ -282,6 +357,9 @@ function promptForLocation(originalQuery) {
     };
 }
 
+/**
+ * CORRECTION CRITIQUE: Fixe l'URL Google Maps.
+ */
 function requestUserLocation(originalQuery) {
     appendMessage('bot', "Localisation en cours...");
     
@@ -293,17 +371,16 @@ function requestUserLocation(originalQuery) {
                     lng: position.coords.longitude
                 };
                 
-                // Retirer les mots-clés de proximité de la requête pour la recherche Maps
-                const searchKeyword = originalQuery.toLowerCase().replace(new RegExp(GEO_KEYWORDS_PROXIMITY.join('|'), 'g'), '').trim();
+                // Retirer les mots-clés de proximité de la requête pour isoler l'activité (ex: 'banque' dans 'banque près de moi')
+                const proximityRegex = new RegExp(GEO_KEYWORDS_PROXIMITY.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|'), 'gi');
+                const searchKeyword = originalQuery.replace(proximityRegex, '').trim();
                 
                 // Générer le lien Google Maps
-                // La requête maps sera : [profession] @ [lat, lng]
-                // ENCODAGE ESSENTIEL pour l'URL
-                const mapsUrl = `https://www.google.com/maps/search/${encodeURIComponent(searchKeyword)}/@${userLocation.lat},${userLocation.lng},14z`;
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchKeyword)}&query_place_id=&center=${userLocation.lat},${userLocation.lng}&zoom=14`;
 
                 const successMessage = `
                     Position obtenue. Pour voir les **${searchKeyword || 'professionnels'}** classés par distance par Google Maps, cliquez sur le lien ci-dessous.
-                    <p><a href="${mapsUrl}" target="_blank" class="location-link" style="color:#25D366; text-decoration:underline;">▶️ Lancer la recherche sur Google Maps</a></p>
+                    <p><a href="${mapsUrl}" target="_blank" class="location-link custom-btn-link">▶️ Lancer la recherche sur Google Maps</a></p>
                 `;
                 appendMessage('bot', successMessage, true);
                 
@@ -337,70 +414,17 @@ function requestUserLocation(originalQuery) {
     }
 }
 
-
-function filterData(query) {
-    if (!query) {
-        return proData.sort(sortProfessionals);
-    }
-    
-    const lowerQuery = normalizeKeyword(query);
-    const queryWords = query ? lowerQuery.split(/[\\s,;']+/).filter(w => w.length > 2) : [];
-    
-    let activite = '';
-    let ville = '';
-    
-    // Détermination de la ville ou localisation
-    for (const city of ALL_CITIES) {
-        if (lowerQuery.includes(city)) {
-            ville = city;
-            break;
-        }
-    }
-    
-    // Détermination de l'activité
-    const parts = lowerQuery.split(/à |près de |autour de |en |dans /);
-    if (parts.length > 0 && parts[0].trim().length > 2) {
-        activite = parts[0].trim();
-    } else if (!ville) {
-        activite = lowerQuery;
-    }
-    
-    // Logique de filtrage
-    let filteredList = proData.filter(pro => {
-        let matchActivite = false;
-        let matchVille = false;
-        
-        const proActivite = normalizeKeyword(pro.activite);
-        const proSecteur = normalizeKeyword(pro.secteur);
-        const proVille = normalizeKeyword(pro.ville);
-        const proQuartier = normalizeKeyword(pro.quartier);
-
-        // 1. Logique d'Activité
-        if (activite) {
-            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
-                            queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
-        } else {
-            matchActivite = true; 
-        }
-        
-        // 2. Logique de Ville/Quartier
-        if (ville) {
-            const fullLocation = proVille + ' ' + proQuartier;
-            matchVille = fullLocation.includes(lowerQuery) || proVille.includes(ville);
-        } else {
-            matchVille = true;
-        }
-        
-        return matchActivite && matchVille;
-    });
-    
-    return filteredList.sort(sortProfessionals);
-}
-
+/**
+ * CORRECTION CRITIQUE: S'assure que les cartes sont des éléments de chat corrects.
+ */
 function filterAndDisplayResults(query) {
     const filteredPros = filterData(query);
     
-    const existingMessages = Array.from(chatBox.children).filter(child => child.classList.contains('message') || child.classList.contains('location-prompt'));
+    // Vider les anciens messages de résultats, mais garder les messages de chat (pour l'historique)
+    // On conserve uniquement les messages de la conversation, et on retire les cartes précédentes
+    const existingMessages = Array.from(chatBox.children).filter(child => 
+        !child.classList.contains('pro-card-wrapper') // Retirer les anciens wrappers de cartes
+    );
     chatBox.innerHTML = '';
     existingMessages.forEach(msg => chatBox.appendChild(msg));
 
@@ -412,9 +436,23 @@ function filterAndDisplayResults(query) {
         appendMessage('bot', `Désolé, je n'ai trouvé aucun professionnel correspondant à votre recherche "${query}". Essayez des mots-clés différents ou une autre ville.`);
     } else {
         appendMessage('bot', `J'ai trouvé ${filteredPros.length} professionnel(s) correspondant(s) à votre recherche. Voici les meilleurs (triés par Note/Avis) :`);
+        
+        // CORRECTION D'AFFICHAGE: Créer un wrapper de message pour chaque carte
         filteredPros.slice(0, 5).forEach(pro => { 
-            chatBox.appendChild(renderProCard(pro));
+            // 1. Obtenir la carte DIV (.pro-card)
+            const proCardElement = renderProCard(pro); 
+            
+            // 2. Créer un wrapper de message pour le style de bulle de chat
+            const wrapper = document.createElement('div');
+            wrapper.classList.add('message', 'bot-message', 'animated-message', 'pro-card-wrapper');
+            
+            // 3. Ajouter la carte à l'intérieur du wrapper
+            wrapper.appendChild(proCardElement);
+            
+            // 4. Ajouter le wrapper au chat
+            chatBox.appendChild(wrapper);
         });
+        
          if (filteredPros.length > 5) {
              appendMessage('bot', `... ${filteredPros.length - 5} autres experts trouvés. Soyez plus précis pour affiner.`, false);
         }
@@ -430,33 +468,29 @@ function handleChat() {
     appendMessage('user', query);
     userInput.value = '';
     
-    // Détecter si la requête est du type "près de moi" pour un lieu (Banque, Hôpital, etc.)
-    const isProximityQuery = GEO_KEYWORDS_PROXIMITY.some(keyword => query.toLowerCase().includes(keyword));
-    const isPlaceQuery = GEO_KEYWORDS_PLACES.some(keyword => query.toLowerCase().includes(keyword));
+    const lowerQuery = query.toLowerCase();
     
-    if (isProximityQuery) {
-        // Pour les requêtes de proximité, on ne fait le prompt que si c'est une nouvelle requête
-        if (lastProximityQuery !== query) {
-            lastProximityQuery = query; 
-            promptForLocation(query);
-        } else {
-            // Si l'utilisateur relance juste la même requête, on fait une recherche normale.
-            filterAndDisplayResults(query);
-            lastProximityQuery = ''; 
-        }
+    // Détecter si la requête est du type "près de moi" pour un lieu (Banque, Hôpital, etc.)
+    const isProximityQuery = GEO_KEYWORDS_PROXIMITY.some(keyword => lowerQuery.includes(keyword));
+    const isPlaceQuery = GEO_KEYWORDS_PLACES.some(keyword => lowerQuery.includes(keyword));
+    
+    if (isProximityQuery || isPlaceQuery) {
+        // Pour les requêtes de proximité/lieu, on demande la position
+        promptForLocation(query);
     } else {
         // Recherche normale
         filterAndDisplayResults(query);
-        lastProximityQuery = ''; 
     }
 }
 
 
 // GESTION DES ÉVÉNEMENTS
 startChatBtn.addEventListener('click', () => {
-    homePage.classList.add('d-none');
-    chatPage.classList.remove('d-none');
-    userInput.focus();
+    showPage('chat');
+});
+
+accueilBtnNav.addEventListener('click', () => {
+    showPage('home');
 });
 
 sendBtn.addEventListener('click', handleChat);
@@ -470,4 +504,3 @@ userInput.addEventListener('keypress', (e) => {
 
 // Démarrage : chargement initial des données
 document.addEventListener('DOMContentLoaded', loadProData);
-
