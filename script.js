@@ -199,7 +199,7 @@ async function loadSheetData() {
         const VILLE_INDEX = headers.findIndex(h => h.includes('Ville'));
         const QUARTIER_INDEX = headers.findIndex(h => h.includes('Quartier'));
         const SECTEUR_INDEX = headers.findIndex(h => h.includes('Secteur Général'));
-        const ACTIVITE_INDEX = headers.findIndex(h => h.includes('Activité Détaillée'));
+        const ACTIVITE_INDEX = headers.findIndex(h => h.includes('Activité détaillée'));
         const EXPERIENCE_INDEX = headers.findIndex(h => h.includes('Experiences (ans)'));
         const PRIX_MIN_INDEX = headers.findIndex(h => h.includes('Prix Min (FCFA)'));
         const PRIX_MAX_INDEX = headers.findIndex(h => h.includes('Prix Max (FCFA)'));
@@ -524,3 +524,4 @@ function searchProfessionals(query, activite, ville, degrade = false) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
+
