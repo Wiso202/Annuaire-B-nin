@@ -1,14 +1,14 @@
 // =====================================================================
 // ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
 // =====================================================================
-const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
+const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1n2n1vdQvUR9X7t9Vd6VanBz41nYBnjQhIXdOWixBogA/gviz/tq?tqx=out:json'; 
 // =====================================================================
 
 let proData = []; 
 // Nouvelle variable pour stocker la position de l'utilisateur
 let userLocation = null;
 
-// Éléments DOM (inchangés)
+// Éléments DOM
 const chatBox = document.getElementById('chat-box');
 const userInput = document.getElementById('user-input');
 const sendBtn = document.getElementById('send-btn');
@@ -16,354 +16,476 @@ const homePage = document.getElementById('home-page');
 const chatPage = document.getElementById('chat-page');
 const startChatBtn = document.getElementById('start-chat-btn');
 const accueilBtnNav = document.getElementById('accueil-btn-nav');
+const proListContainer = document.getElementById('pro-list-container');
+const loadMoreBtn = document.getElementById('load-more-btn');
 
+// État de la recherche
+let currentSearchResults = []; // Les professionnels qui correspondent à la recherche actuelle
+let professionalsPerPage = 5; // Nombre de pros à afficher par page
+let currentPage = 0; // Page actuelle
+let currentQuery = ''; // Dernière requête utilisateur pour le mode conversationnel
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU) - INCHANGÉES
+// LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU)
 // =====================================================================
 
 const SECTOR_COLUMNS = [
     'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
     'Tourisme / Loisirs', 'Services à la personne', 'Agriculture / Élevage / Pêche', 
-    'Droit / Juridique', 'Énergie / Environnement', 'Autres services spécialisés', 
-    'Alimentation', 'Mode / Couture', 'Beauté / Esthétique', 
-    'Technologie / Informatique', 'Automobile / Mécanique', 'BTP / Construction', 
-    'Santé / Pharmacie', 'Éducation / Formation', 'Artisanat / Création', 
-    'Commerce général'
+    'Droit / Juridique', 'Art / Culture / Divertissement'
+    // Les autres secteurs sont gérés par le secteur général 'Autres'
 ];
 
-const ALL_SPECIALTIES = [
-    'Restauration', 'Traiteur', 'Vente de produits locaux', 'Transformation alimentaire', 'Boulangerie / Pâtisserie', 'Livraison de repas',
-    'Styliste / Créateur', 'Couturier / Couturière', 'Retouche / Réparation', 'Vente de vêtements', 'Accessoires de mode',
-    'Coiffure', 'Maquillage', 'Manucure / Pédicure', 'Soins corporels / Massage', 'Spa / Institut',
-    'Dépannage / Réparation', 'Vente de matériel', 'Développement web / mobile', 'Graphisme / Design', 'Formation / Cybersécurité',
-    'Mécanicien', 'Lavage auto', 'Vente de pièces', 'Peinture auto', 'Diagnostic électronique',
-    'Maçonnerie', 'Plomberie', 'Électricité', 'Peinture', 'Menuiserie (bois, alu)', 'Architecture / Dessin technique',
-    'Pharmacien', 'Infirmier / Soins à domicile', 'Médecin', 'Laboratoire', 'Produits pharmaceutiques / parapharmacie',
-    'Enseignant / Cours particuliers', 'Centre de formation', 'École privée', 'Formateur professionnel', 'Soutien scolaire',
-    'Menuiserie', 'Sculpture', 'Tissage / Bijoux', 'Décoration / Objets artistiques', 'DAO / Modélisation',
-    'Boutique / Vente', 'Supermarché', 'Import / Export', 'Vente en ligne (e-commerce)', 'Grossiste / Détail',
-    'Microfinance', 'Agent mobile money', 'Courtier / Assurance', 'Comptabilité / Gestion', 'Fintech / Paiement numérique',
-    'Taxi / Zemidjan', 'Livraison', 'Location de véhicules', 'Transit / Fret', 'Déménagement',
-    'Création de contenu', 'Photographe / Vidéaste', 'Publicité / Marketing digital', 'Agence de communication', 'Imprimerie / Graphisme',
-    'Guide touristique', 'Hôtel / Auberge', 'Restaurant / Bar', 'Organisation d’événements', 'Location de salle / espace',
-    'Garde d’enfants', 'Femme de ménage', 'Assistance à domicile', 'Agent de sécurité', 'Jardinage',
-    'Production vivrière', 'Élevage', 'Pisciculture', 'Vente de produits agricoles', 'Transformation agroalimentaire',
-    'Avocat', 'Conseiller juridique', 'Notaire', 'Cabinet d’expertise', 'Médiation',
-    'Installation solaire', 'Recyclage', 'Gestion des déchets', 'Fourniture d’équipements électriques', 'Énergies renouvelables',
-    'Consultant indépendant', 'Traducteur', 'Développeur freelance', 'Coach / Formateur personnel', 'Service sur mesure'
-];
+const GEO_KEYWORDS = {
+    // Villes principales (clés de recherche)
+    'cotonou': ['cotonou', 'calavi', 'abomey-calavi', 'porto-novo', 'parakou'],
+    'parakou': ['parakou', 'kandi', 'natitingou'],
+    // ... ajouter d'autres villes ou régions clés si nécessaire
+    // Mots clés de localisation générale
+    'ville': ['ville', 'localité', 'où', 'dans quel endroit', 'proche', 'autour', 'quartier'],
+    'region': ['région', 'zone', 'département', 'pays'],
+    'proche': ['près', 'proximité', 'proche', 'aux alentours', 'à côté', 'autour']
+};
 
-const ALL_CITIES = [
-    'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Malanville', 'Segbana', 'Boukoumbé', 'Cobly', 'Kérou', 'Kouandé', 
-    'Matéri', 'Natitingou', 'Péhunco', 'Tanguiéta', 'Toucountouna', 'Abomey-Calavi', 'Allada', 'Kpomassè', 'Ouidah', 
-    'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè', 'Bembéréké', 'Kalalé', 'N\'Dali', 'Nikki', 'Parakou', 'Pèrèrè', 'Sinendé', 
-    'Tchaourou', 'Bantè', 'Dassa-Zoumé', 'Glazoué', 'Ouèssè', 'Savalou', 'Savè', 'Aplahoué', 'Djakotomey', 'Dogbo', 
-    'Klouékanmè', 'Lalo', 'Toviklin', 'Bassila', 'Copargo', 'Djougou', 'Ouaké', 'Cotonou', 'Athiémè', 'Bopa', 'Comè', 
-    'Grand-Popo', 'Houéyogbé', 'Lokossa', 'Adjarra', 'Adjohoun', 'Aguégués', 'Akpro-Missérété', 'Avrankou', 'Bonou', 
-    'Dangbo', 'Porto-Novo', 'Sèmè-Kpodji', 'Ifangni', 'Kétou', 'Pobè', 'Sakété', 'Abomey', 'Agbangnizoun', 'Bohicon', 
-    'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
-].map(city => city.toLowerCase()); 
-
-// LISTE ÉTENDUE des lieux à chercher à proximité
-const GEO_KEYWORDS = [
-    'banque', 'hôpital', 'pharmacie', 'commissariat', 'poste', 'urgence', 'distributeur', 
-    'supermarché', 'restaurant', 'marché', 'école', 'université', 'stade', 'mosquée', 
-    'église', 'hôtel', 'aéroport', 'bus', 'station-service', 'garage' 
-];
-
+const ACTION_KEYWORDS = {
+    'search': ['cherche', 'trouve', 'recherche', 'besoin', 'recommander', 'recommande', 'un pro', 'un professionnel'],
+    'contact': ['contacter', 'numéro', 'appel', 'téléphone', 'whatsapp', 'joindre', 'parler à'],
+    'prix': ['prix', 'tarif', 'coût', 'cher', 'combien'],
+    'avis': ['avis', 'note', 'réputation', 'meilleur'],
+    'localiser': ['où est-il', 'localiser', 'adresse', 'position'],
+};
 
 // =====================================================================
-// FONCTIONS DE BASE - INCHANGÉES
+// FONCTIONS UTILITAIRES DE NETTOYAGE ET D'AFFICHAGE
 // =====================================================================
 
-function showPage(pageId) {
-    if (pageId === 'home') {
-        homePage.style.opacity = 1;
-        chatPage.style.opacity = 0;
-        homePage.style.transform = 'translateX(0)';
-        chatPage.style.transform = 'translateX(100%)';
-        setTimeout(() => {
-            homePage.classList.remove('d-none');
-            chatPage.classList.add('d-none');
-        }, 500); 
+/**
+ * Normalise une chaîne de caractères pour faciliter la recherche (minuscules, sans accents).
+ * @param {string} str - La chaîne à normaliser.
+ * @returns {string} - La chaîne normalisée.
+ */
+function normalizeKeyword(str) {
+    if (typeof str !== 'string') return '';
+    return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
 
-    } else if (pageId === 'chat') {
-        chatPage.style.opacity = 0;
-        chatPage.style.transform = 'translateX(100%)';
-        chatPage.classList.remove('d-none');
-        
-        setTimeout(() => {
-            homePage.style.opacity = 0;
-            chatPage.style.opacity = 1;
-            chatPage.style.transform = 'translateX(0)';
-            userInput.focus();
-        }, 50); 
-        
-        setTimeout(() => {
-            homePage.classList.add('d-none');
-        }, 500);
+/**
+ * Affiche un message dans la boîte de dialogue (chat).
+ * @param {string} message - Le message à afficher.
+ * @param {string} sender - L'expéditeur ('user' ou 'ai').
+ */
+function appendMessage(message, sender) {
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('chat-message', `${sender}-message`);
+    
+    // Remplacement du texte de l'AI pour inclure un lien de retour d'accueil si nécessaire
+    if (sender === 'ai') {
+        message = message.replace(/\[accueil\]/g, '<a href="#" id="ai-home-link" class="text-accent fw-bold text-decoration-none">Accueil</a>');
+    }
+    
+    messageElement.innerHTML = `
+        <div class="message-bubble ${sender === 'ai' ? 'bg-secondary' : 'bg-primary'} p-3 rounded-lg shadow-sm">
+            ${message}
+        </div>
+    `;
+    chatBox.appendChild(messageElement);
+    chatBox.scrollTop = chatBox.scrollHeight; // Scroll vers le bas
+    
+    // Ajout d'un écouteur d'événement pour le lien Accueil dans le message AI
+    if (sender === 'ai' && message.includes('ai-home-link')) {
+        document.getElementById('ai-home-link')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateTo('home');
+        });
     }
 }
-startChatBtn.addEventListener('click', () => showPage('chat'));
-accueilBtnNav.addEventListener('click', () => showPage('home'));
 
-function addMessage(text, sender) {
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message', 'animated-message');
+/**
+ * Construit et affiche la carte d'un professionnel.
+ * @param {object} pro - L'objet professionnel.
+ * @param {boolean} highlight - Indique si le résultat doit être mis en évidence (nouveau).
+ * @returns {string} - Le HTML de la carte du professionnel.
+ */
+function createProCard(pro, highlight = false) {
+    const contactMethod = pro.contact_whatsapp || pro.contact_telephone;
+    const whatsappLink = pro.contact_whatsapp ? `https://wa.me/${pro.contact_whatsapp.replace(/\D/g, '')}` : null;
+    const isVerified = pro.verification === 'Oui';
+    const hasGps = pro.indication_gps && pro.indication_gps !== 'Non renseigné' && pro.indication_gps !== 'Non';
     
-    if (sender === 'bot') {
-        messageDiv.innerHTML = text;
+    // Déterminer la classe de couleur de la note (vert, orange, rouge)
+    let ratingColor = 'text-gray-400';
+    if (pro.note_avis >= 4.5) {
+        ratingColor = 'text-green-500';
+    } else if (pro.note_avis >= 3.0) {
+        ratingColor = 'text-yellow-500';
+    } else if (pro.note_avis > 0) {
+        ratingColor = 'text-red-500';
+    }
+    
+    const ratingDisplay = pro.note_avis > 0 
+        ? `<i class="bi bi-star-fill ${ratingColor} me-1"></i> ${pro.note_avis.toFixed(1)}` 
+        : '<span class="text-gray-400">Pas encore noté</span>';
+    
+    const verificationBadge = isVerified ? 
+        `<span class="verified-badge"><i class="bi bi-patch-check-fill me-1"></i> Vérifié</span>` : 
+        '';
+
+    const locationLink = hasGps ?
+        `<a href="${pro.indication_gps}" target="_blank" class="location-link"><i class="bi bi-geo-alt-fill me-1"></i> Voir sur la carte</a>` :
+        `<span class="text-gray-500"><i class="bi bi-geo-alt me-1"></i> Localisation : ${pro.ville}, ${pro.quartier}</span>`;
+
+    const priceRange = (pro.prix_min && pro.prix_max) && (pro.prix_min !== 'Non renseigné' || pro.prix_max !== 'Non renseigné') 
+        ? `<div class="text-sm text-secondary-text mt-2"><i class="bi bi-currency-dollar me-1"></i> Prix indicatif : ${pro.prix_min} - ${pro.prix_max} FCFA</div>`
+        : '';
+
+    return `
+        <div class="pro-card ${highlight ? 'highlight-card' : ''} p-4 mb-4 rounded-lg shadow-xl animated-pop" data-delay="0s">
+            <h3 class="card-title text-accent mb-2 d-flex align-items-center">
+                ${pro.nom_entreprise} ${verificationBadge}
+            </h3>
+            <p class="card-subtitle text-secondary-text mb-2">${pro.activite} (${pro.secteur})</p>
+            
+            <div class="card-meta d-flex justify-content-between align-items-center mb-3">
+                <span class="rating-display">${ratingDisplay}</span>
+                <span class="text-sm text-gray-400"><i class="bi bi-clock-fill me-1"></i> Expérience : ${pro.experience_ans} an(s)</span>
+            </div>
+            
+            <p class="card-description">${pro.activite_detaillee}</p>
+            
+            ${priceRange}
+            
+            <div class="card-footer mt-3 pt-3 border-t border-gray-700">
+                ${locationLink}
+                ${whatsappLink ? 
+                    `<a href="${whatsappLink}" target="_blank" class="whatsapp-link">
+                        <i class="bi bi-whatsapp me-1"></i> Contacter par WhatsApp
+                    </a>` : 
+                    `<span class="text-sm text-gray-500">Contact : ${contactMethod || 'Non Public'}</span>`
+                }
+            </div>
+        </div>
+    `;
+}
+
+/**
+ * Affiche la liste paginée des professionnels.
+ * @param {Array<object>} results - Le tableau des professionnels à afficher.
+ * @param {boolean} isInitialSearch - Indique si c'est la première fois qu'on affiche les résultats pour une nouvelle requête.
+ */
+function displayProfessionals(results, isInitialSearch = true) {
+    if (isInitialSearch) {
+        proListContainer.innerHTML = '';
+        currentPage = 0;
+        currentSearchResults = results;
+    }
+    
+    if (results.length === 0 && isInitialSearch) {
+        proListContainer.innerHTML = '<p class="text-secondary-text text-center mt-5">Aucun professionnel trouvé pour cette recherche.</p>';
+        loadMoreBtn.style.display = 'none';
+        return;
+    }
+
+    const startIndex = currentPage * professionalsPerPage;
+    const endIndex = startIndex + professionalsPerPage;
+    const prosToDisplay = currentSearchResults.slice(startIndex, endIndex);
+
+    prosToDisplay.forEach((pro, index) => {
+        // Met en évidence uniquement le premier résultat de la première page
+        const highlight = (isInitialSearch && index === 0); 
+        proListContainer.innerHTML += createProCard(pro, highlight);
+    });
+
+    // Gestion du bouton "Afficher plus"
+    if (endIndex < currentSearchResults.length) {
+        loadMoreBtn.style.display = 'block';
     } else {
-        messageDiv.textContent = text;
+        loadMoreBtn.style.display = 'none';
     }
     
-    chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
+    currentPage++; // Incrémenter la page pour le prochain chargement
 }
-function handleUserQuery() {
-    const query = userInput.value.trim();
-    if (query === '') return;
 
-    addMessage(query, 'user');
+// =====================================================================
+// FONCTIONS D'ANALYSE DU LANGAGE NATUREL
+// =====================================================================
+
+/**
+ * Extrait le mot-clé principal de l'activité.
+ * @param {string} query - La requête utilisateur.
+ * @returns {string} - Le mot-clé d'activité normalisé.
+ */
+function extractActivity(query) {
+    const normalizedQuery = normalizeKeyword(query);
+    
+    // Tente de trouver un mot-clé qui correspond à un secteur ou une colonne connue.
+    const activityKeywords = SECTOR_COLUMNS.map(normalizeKeyword);
+    for (const keyword of activityKeywords) {
+        if (normalizedQuery.includes(keyword)) {
+            return keyword;
+        }
+    }
+    
+    // Si aucun secteur connu n'est trouvé, retourne le premier nom/verbe significatif (heuristique simple)
+    const actionWords = Object.values(ACTION_KEYWORDS).flat().map(normalizeKeyword);
+    const stopWords = ['de', 'du', 'des', 'le', 'la', 'les', 'un', 'une', 'des', 'je', 'veux', 'cherche', 'trouve', 'pour', 'qui', 'est', 'sont'];
+    
+    const words = normalizedQuery.split(/\s+/).filter(word => word.length > 2 && !stopWords.includes(word) && !actionWords.includes(word));
+    
+    return words[0] || normalizedQuery; // Retourne le premier mot significatif, ou la requête entière par défaut
+}
+
+/**
+ * Extrait les mots-clés de localisation.
+ * @param {string} query - La requête utilisateur.
+ * @returns {{ville: string|null, degrade: boolean}} - L'objet de localisation.
+ */
+function extractLocation(query) {
+    const normalizedQuery = normalizeKeyword(query);
+    let ville = null;
+    let degrade = false; // Flag pour indiquer une recherche de proximité ou dégradée
+    
+    // 1. Recherche de villes spécifiques
+    for (const cityKey in GEO_KEYWORDS) {
+        if (GEO_KEYWORDS[cityKey].some(k => normalizedQuery.includes(k))) {
+            ville = cityKey;
+            break;
+        }
+    }
+
+    // 2. Recherche de proximité (active la recherche dégradée)
+    if (GEO_KEYWORDS.proche.some(k => normalizedQuery.includes(k))) {
+        degrade = true;
+    }
+    
+    // 3. Si aucune ville spécifique n'est trouvée, essaie de prendre le dernier mot comme ville
+    if (!ville) {
+        const words = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
+        if (words.length > 0) {
+            // Option 1: Considérer les 1 ou 2 derniers mots comme la ville/quartier potentielle
+            const lastWords = words.slice(-2).join(' '); 
+            ville = lastWords; 
+        }
+    }
+    
+    return { ville, degrade };
+}
+
+/**
+ * Fonction principale de recherche des professionnels.
+ * @param {string} query - La requête utilisateur.
+ * @returns {Array<object>} - Tableau des professionnels correspondants.
+ */
+function searchProfessionals(query) {
+    // 1. Extraction des mots-clés
+    const activite = extractActivity(query);
+    const { ville, degrade } = extractLocation(query);
+
+    // Mots-clés de la requête (nettoyés)
+    const queryWords = query ? query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2).map(normalizeKeyword) : [];
+
+    return proData.filter(pro => {
+        let matchActivite = false;
+        let matchVille = false;
+        
+        const proActivite = normalizeKeyword(pro.activite);
+        const proSecteur = normalizeKeyword(pro.secteur);
+        const proVille = normalizeKeyword(pro.ville);
+        const proQuartier = normalizeKeyword(pro.quartier);
+
+        // 1. Logique d'Activité
+        if (activite) {
+            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
+                            queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
+        } else {
+            matchActivite = true; // Si aucune activité n'est spécifiée, le filtre d'activité passe
+        }
+        
+        // 2. Logique de Ville/Quartier (Dégradation)
+        if (ville) {
+            if (degrade) {
+                // Recherche dégradée (proximité) : Ville uniquement
+                matchVille = proVille.includes(ville);
+            } else {
+                // Recherche stricte : Ville OU (Ville + Quartier)
+                const fullLocation = proVille + ' ' + proQuartier;
+                matchVille = fullLocation.includes(normalizeKeyword(query)) || proVille.includes(ville);
+            }
+        } else {
+            matchVille = true; // Si aucune ville n'est spécifiée, le filtre de ville passe
+        }
+        
+        return matchActivite && matchVille;
+    });
+}
+
+// =====================================================================
+// FONCTIONS DE GESTION DE L'API GEMINI (Recherche et Conversation)
+// =====================================================================
+
+// Laissez apiKey vide; le framework Canvas le fournira au runtime.
+const GEMINI_API_KEY = ""; 
+const GEMINI_API_URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
+const MAX_RETRIES = 5;
+
+/**
+ * Fonction pour appeler l'API Gemini avec gestion des tentatives.
+ * @param {object} payload - Le corps de la requête JSON.
+ * @returns {Promise<object>} - La réponse JSON de l'API.
+ */
+async function callGeminiApi(payload) {
+    let lastError = null;
+    for (let i = 0; i < MAX_RETRIES; i++) {
+        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000; // Délai exponentiel avec jitter
+        if (i > 0) await new Promise(resolve => setTimeout(resolve, delay));
+
+        try {
+            const url = `${GEMINI_API_URL_BASE}?key=${GEMINI_API_KEY}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                return response.json();
+            } else if (response.status === 429 || response.status >= 500) {
+                // Erreur de taux limité ou erreur serveur, on retente
+                lastError = `Erreur API: ${response.status} ${response.statusText}`;
+                console.warn(`Tentative ${i + 1} échouée. Retraitement dans ${delay / 1000}s.`, lastError);
+            } else {
+                // Erreur client irrécupérable
+                const errorBody = await response.json();
+                throw new Error(`Erreur API irrécupérable: ${response.status} - ${errorBody.error?.message || response.statusText}`);
+            }
+        } catch (error) {
+            lastError = error;
+            console.error(`Erreur lors de la tentative ${i + 1}:`, error);
+        }
+    }
+    // Si toutes les tentatives ont échoué
+    throw new Error(`Échec de l'appel API après ${MAX_RETRIES} tentatives: ${lastError ? lastError.message || lastError : 'Erreur inconnue'}`);
+}
+
+
+/**
+ * Analyse la requête utilisateur pour déterminer s'il s'agit d'une recherche ou d'une question.
+ * Puis, génère une réponse AI basée sur les résultats de la recherche interne et/ou Gemini.
+ * @param {string} rawQuery - La requête utilisateur non traitée.
+ */
+async function processUserQuery(rawQuery) {
+    appendMessage(rawQuery, 'user');
     userInput.value = '';
+    currentQuery = rawQuery; // Stocke la requête pour les interactions futures
 
-    processBotResponse(query);
-}
-sendBtn.addEventListener('click', handleUserQuery);
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        handleUserQuery();
-    }
-});
-
-
-// =====================================================================
-// NOUVELLES FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES - INCHANGÉES SAUF POUR LA RÉFÉRENCE GPS
-// =====================================================================
-
-function getStarRating(note) {
-    const normalizedNote = Math.max(0, Math.min(5, parseFloat(note)));
-    const roundedNote = Math.round(normalizedNote * 2) / 2; 
-
-    let stars = '';
+    // 1. Recherche interne des professionnels
+    const searchResults = searchProfessionals(rawQuery);
     
-    const fullStars = Math.floor(roundedNote);
-    for (let i = 0; i < fullStars; i++) {
-        stars += '★'; 
-    }
-    
-    const hasHalfStar = (roundedNote - fullStars) === 0.5;
-    if (hasHalfStar) {
-        stars += '½'; 
-    }
+    // 2. Afficher la liste des professionnels
+    displayProfessionals(searchResults, true);
 
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 0.5 : 0);
-    for (let i = 0; i < Math.floor(emptyStars); i++) {
-        stars += '☆'; 
+    // 3. Préparation du prompt pour Gemini
+    let prompt;
+    let systemInstruction;
+
+    // Contexte de la recherche
+    const proCount = searchResults.length;
+    let proContext = '';
+    
+    if (proCount > 0) {
+        // Crée un contexte détaillé pour les 3 meilleurs résultats
+        const topPros = searchResults.slice(0, 3).map((pro, index) => 
+            `\n${index + 1}. ${pro.nom_entreprise} - Activité: ${pro.activite} - Détails: ${pro.activite_detaillee} - Ville: ${pro.ville}, ${pro.quartier} - Note: ${pro.note_avis} - Contact: ${pro.contact_whatsapp || pro.contact_telephone || 'Non public'}`
+        ).join('');
+
+        proContext = `J'ai trouvé ${proCount} professionnel(s) correspondant(s) à la requête. Les meilleurs résultats sont:\n${topPros}\n---\n`;
+    } else {
+        proContext = `Je n'ai trouvé aucun professionnel dans mon annuaire pour cette requête.`;
     }
     
-    return `<span class="star-rating">${stars}</span>`;
-}
+    // Contexte général et instructions de rôle
+    systemInstruction = {
+        parts: [{ text: `
+            Vous êtes ProFinder AI, un assistant conversationnel pour l'annuaire de professionnels. 
+            Votre rôle est d'analyser la requête de l'utilisateur.
 
-function formatFCFA(number) {
-    if (number === null || isNaN(number)) return '';
-    return new Intl.NumberFormat('fr-FR').format(number) + ' FCFA';
-}
-
-function sortProfessionals(a, b) {
-    if (b.note !== a.note) {
-        return b.note - a.note; 
-    }
-    return b.experience - a.experience; 
-}
-
-// MISE À JOUR : Adaptation des indices de colonnes
-async function loadSheetData() {
-    addMessage("Chargement des données de l'annuaire...", 'bot');
+            -- Règles de Réponse --
+            1. Si des professionnels ont été trouvés (voir CONTEXTE), vous devez:
+               - Confirmer la recherche et mentionner le nombre de résultats trouvés.
+               - Inviter l'utilisateur à parcourir la liste affichée ci-dessous.
+               - NE PAS répéter les détails de contact ou d'activité des professionnels. Dites simplement: "Tous les détails sont affichés dans les cartes ci-dessous."
+               - Suggérer une nouvelle recherche plus précise.
+            2. Si AUCUN professionnel n'a été trouvé (voir CONTEXTE), vous devez:
+               - Expliquer poliment qu'aucun résultat interne n'a été trouvé.
+               - Lancer une recherche Google pour tenter de répondre à la question de manière générale (Utilisez l'outil Google Search).
+               - Si Google Search fournit des informations pertinentes, résumez-les en français.
+            3. Si la requête est une question générale (non liée à la recherche d'un pro) ou nécessite des informations actualisées (ex: "Quel est le taux de change du jour ?"), utilisez l'outil Google Search.
+            4. Votre ton est professionnel, amical et précis.
+            5. Utilisez toujours le français.
+            
+            CONTEXTE ACTUEL (Annuaire Interne):
+            ${proContext}
+            ` 
+        }]
+    };
     
+    // La requête utilisateur envoyée à Gemini
+    prompt = `Requête de l'utilisateur: "${rawQuery}"`;
+
+    let responseText = "🤖 *ProFinder AI est en ligne...*";
+    appendMessage(responseText, 'ai');
+    
+    // Création de l'élément de message de l'AI pour le mettre à jour plus tard
+    const aiMessageElement = chatBox.lastElementChild.querySelector('.message-bubble');
+
     try {
-        const response = await fetch(SHEET_API_URL);
-        const text = await response.text();
+        const payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            // Active Google Search grounding si nécessaire (pour les questions générales ou l'absence de résultats internes)
+            tools: [{ "google_search": {} }], 
+            systemInstruction: systemInstruction,
+        };
         
-        const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
-        const data = JSON.parse(jsonText);
+        const apiResponse = await callGeminiApi(payload);
         
-        const rows = data.table.rows;
-        const headers = data.table.cols.map(col => col.label);
-        
-        // NOUVEAUX INDICES BASÉS SUR LES EN-TÊTES FOURNIES
-        const NOM_INDEX = headers.findIndex(h => h.includes('Nom du contact'));
-        const ENTREPRISE_INDEX = headers.findIndex(h => h.includes('Nom de l\'Entreprise'));
-        const CONTACT_INDEX = headers.findIndex(h => h.includes('WhatsApp'));
-        const VILLE_INDEX = headers.findIndex(h => h.includes('Ville'));
-        const QUARTIER_INDEX = headers.findIndex(h => h.includes('Quartier'));
-        const SECTEUR_INDEX = headers.findIndex(h => h.includes('Secteur Général'));
-        const ACTIVITE_INDEX = headers.findIndex(h => h.includes('Activité détaillée'));
-        const EXPERIENCE_INDEX = headers.findIndex(h => h.includes('Experiences (ans)'));
-        const PRIX_MIN_INDEX = headers.findIndex(h => h.includes('Prix Min (FCFA)'));
-        const PRIX_MAX_INDEX = headers.findIndex(h => h.includes('Prix Max (FCFA)'));
-        const NOTE_INDEX = headers.findIndex(h => h.includes('Note/Avis'));
-        // Utilisation de 'Visibilité Publique' pour simuler 'Verifie_GPS'
-        const VISIBILITE_PUBLIQUE_INDEX = headers.findIndex(h => h.includes('Visibilité Publique'));
-        
-        // NOTE: Les colonnes Latitude et Longitude NE SONT PAS présentes dans les en-têtes listées. 
-        // Les champs 'latitude' et 'longitude' dans l'objet pro seront donc NULL.
-        const LATITUDE_INDEX = -1; // Non trouvé
-        const LONGITUDE_INDEX = -1; // Non trouvé
+        const candidate = apiResponse.candidates?.[0];
+        responseText = candidate?.content?.parts?.[0]?.text || "Désolé, je n'ai pas pu générer de réponse pour le moment.";
 
-
-        const formattedData = rows.slice(1).map(row => {
-            const cells = row.c;
-
-            // Récupération des données selon les nouveaux indices
-            const nomCell = cells[NOM_INDEX];
-            const entrepriseCell = cells[ENTREPRISE_INDEX];
-            const contactCell = cells[CONTACT_INDEX];
-            const villeCell = cells[VILLE_INDEX];
-            const quartierCell = cells[QUARTIER_INDEX];
-            const secteurCell = cells[SECTEUR_INDEX];
-            const activiteCell = cells[ACTIVITE_INDEX];
-            
-            const noteCell = cells[NOTE_INDEX];
-            const experienceCell = cells[EXPERIENCE_INDEX];
-            const prixMinCell = cells[PRIX_MIN_INDEX];
-            const prixMaxCell = cells[PRIX_MAX_INDEX];
-            const visibiliteCell = cells[VISIBILITE_PUBLIQUE_INDEX];
-
-
-            // La condition de filtrage est déplacée après la construction de l'objet
-            
-            return {
-                nom: nomCell ? nomCell.v : '',
-                entreprise: entrepriseCell ? entrepriseCell.v : '',
-                contact: contactCell ? contactCell.v : '',
-                quartier: quartierCell ? quartierCell.v : '',
-                ville: villeCell ? villeCell.v : '',
-                secteur: secteurCell ? secteurCell.v : 'Inconnu',
-                activite: activiteCell ? activiteCell.v : '', // La spécialité exacte
-                
-                // NOUVEAUX CHAMPS DE QUALITÉ ET LOCALISATION
-                note: noteCell && noteCell.v !== null ? parseFloat(noteCell.v) : 0, // 0 par défaut
-                experience: experienceCell && experienceCell.v !== null ? parseInt(experienceCell.v) : 0, // 0 par défaut
-                // Supposition: La Visibilité Publique OUI/NON simule la vérification.
-                verifie_gps: visibiliteCell && visibiliteCell.v ? visibiliteCell.v.toUpperCase() === 'OUI' : false, 
-                prix_min: prixMinCell && prixMinCell.v !== null ? parseFloat(prixMinCell.v) : null,
-                prix_max: prixMaxCell && prixMaxCell.v !== null ? parseFloat(prixMaxCell.v) : null,
-                
-                // LES COORDONNÉES SONT MAINTENANT TOUJOURS NULL
-                latitude: null, 
-                longitude: null, 
-            };
-        }).filter(item => item.activite.trim() !== ''); // N'inclut que les lignes ayant une activité réelle
-
-        proData = formattedData;
-        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot');
+        // Remplacement par la réponse finale
+        aiMessageElement.innerHTML = responseText;
 
     } catch (error) {
-        addMessage("❌ Erreur de connexion aux données. Assurez-vous que le Sheet est public et que l'ID est correct.", 'bot');
-        console.error("Erreur de chargement des données :", error);
+        console.error("Erreur Gemini AI:", error);
+        aiMessageElement.innerHTML = `❌ *Erreur de communication avec l'IA. Veuillez réessayer.*`;
     }
 }
 
 
-// MISE À JOUR : Affichage des nouvelles informations
-function displayResults(results, activite, ville) {
-    let responseHTML = '';
-    const recherche = `**${activite || 'Professionnel'}** ${ville ? 'à **' + ville + '**' : ''}`;
+// =====================================================================
+// FONCTIONS DE CHARGEMENT ET D'INITIALISATION
+// =====================================================================
 
-    if (results.length > 0) {
-        // Tri des résultats avant l'affichage
-        results.sort(sortProfessionals);
-        
-        responseHTML += `<p>✅ J'ai trouvé **${results.length}** résultat(s) pour ${recherche}.</p>
-                         <p class="small fst-italic">Trié par **Note** et **Expérience**.</p>`;
-
-        results.forEach(pro => {
-            const nomAffichage = pro.entreprise.trim() ? `${pro.entreprise} (par ${pro.nom})` : pro.nom;
-            const quartierInfo = pro.quartier.trim() ? ` à ${pro.quartier}` : '';
-            
-            // Badges et Infos Qualité
-            const noteEtoiles = pro.note > 0 ? getStarRating(pro.note) : '';
-            // NOTE : Le badge utilise la Visibilité Publique à la place de la vérification GPS stricte.
-            const badgeVerif = pro.verifie_gps ? `<span class="badge-verified ms-2">PUBLIC</span>` : '';
-            
-            // AFFICHAGE EXPÉRIENCE 
-            const experience = pro.experience > 0 ? `${pro.experience} an(s)` : 'Nouvelle adhésion';
-            
-            let prixInfo = 'Non spécifié';
-            if (pro.prix_min !== null && pro.prix_max !== null) {
-                 prixInfo = `${formatFCFA(pro.prix_min)} - ${formatFCFA(pro.prix_max)}`;
-            } else if (pro.prix_min !== null) {
-                prixInfo = `À partir de : ${formatFCFA(pro.prix_min)}`;
-            }
-
-            // NOUVEAU: Lien de localisation (Actuellement masqué car latitude/longitude sont NULL)
-            // L'ancienne condition est conservée mais sera toujours fausse : 
-            // const mapLink = (pro.latitude && pro.longitude && pro.verifie_gps) ? 
-            //     `<a href="https://maps.google.com/?q=${pro.latitude},${pro.longitude}" target="_blank" class="location-link mt-2"><i class="bi bi-geo-alt-fill"></i> Voir l'adresse</a>` : '';
-            const mapLink = ''; // Remplacé par une chaîne vide pour refléter l'absence de coordonnées.
-
-
-            responseHTML += `
-                <div class="result-card animated-result-card">
-                    <p class="mb-0 text-white fw-bold d-flex align-items-center">${nomAffichage} ${badgeVerif}</p>
-                    <p class="mb-1 text-accent small">${pro.activite} - ${pro.ville}${quartierInfo}</p>
-                    <div class="note-line">
-                        <div>${noteEtoiles}</div>
-                        <div class="experience-text">Expérience : <span>${experience}</span></div>
-                    </div>
-                    <p class="price-range">${prixInfo}</p>
-                    ${mapLink} <a href="https://wa.me/${pro.contact.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
-                        <i class="bi bi-whatsapp"></i> Contacter via WhatsApp
-                    </a>
-                </div>
-            `;
-        });
+/**
+ * Change l'affichage entre la page d'accueil et la page de chat.
+ * @param {string} page - 'home' ou 'chat'.
+ */
+function navigateTo(page) {
+    if (page === 'chat') {
+        homePage.classList.remove('active');
+        chatPage.classList.add('active');
+        // Ajoute un message initial seulement si la boîte est vide
+        if (chatBox.children.length === 0) {
+            appendMessage("Bonjour ! Je suis ProFinder AI. Cherchez-vous un professionnel dans un domaine particulier ou une information ? (Ex: 'plombier à Cotonou' ou 'taux de change')", 'ai');
+        }
     } else {
-        responseHTML = `<p>😔 Désolé, aucun pro n'a été trouvé pour ${recherche}.</p>
-                        <p>👉 **Conseil :** Essayez d'utiliser uniquement un métier générique (ex: 'Mécanicien') ou le nom de la ville (ex: 'Cotonou').</p>`;
+        chatPage.classList.remove('active');
+        homePage.classList.add('active');
     }
-
-    addMessage(responseHTML, 'bot');
 }
 
-
-// =====================================================================
-// LOGIQUE DE GÉOLOCALISATION ET DE RECHERCHE - INCHANGÉE
-// =====================================================================
-// Cette section reste identique car la logique de recherche ProFinder 
-// (Activité/Ville) et la logique de géolocalisation pour les POI 
-// (Banque/Hôpital) sont conservées.
-
-function askForGeolocation(keyword) {
-    const message = `
-        <p>Pour trouver le(la) **${keyword}** le plus proche, j'ai besoin d'accéder à votre position actuelle.</p>
-        <p>Acceptez-vous de partager votre localisation ?</p>
-        <button id="geo-yes" class="custom-btn btn-sm me-2">✅ Oui, Partager</button>
-        <button id="geo-no" class="btn btn-sm btn-danger">❌ Non, Annuler</button>
-    `;
-    addMessage(message, 'bot');
-
-    setTimeout(() => {
-        const geoYesBtn = document.getElementById('geo-yes');
-        const geoNoBtn = document.getElementById('geo-no');
-
-        if (geoYesBtn) {
-            geoYesBtn.addEventListener('click', () => {
-                addMessage('... Acquisition de votre position en cours ...', 'bot');
-                getGeolocation(keyword);
-            }, { once: true });
-        }
-        if (geoNoBtn) {
-            geoNoBtn.addEventListener('click', () => {
-                addMessage(`Recherche de **${keyword}** annulée.`, 'bot');
-            }, { once: true });
-        }
-    }, 100);
-}
-
-function getGeolocation(keyword) {
+/**
+ * Tente d'obtenir la géolocalisation de l'utilisateur.
+ */
+function getUserLocation() {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -371,157 +493,146 @@ function getGeolocation(keyword) {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                addMessage(`Position obtenue : Latitude ${userLocation.lat.toFixed(4)}, Longitude ${userLocation.lng.toFixed(4)}`, 'bot');
-                searchNearby(keyword, userLocation);
+                console.log("Géolocalisation réussie:", userLocation);
+                // Le message de bienvenue peut être adapté ici si la localisation est connue
             },
             (error) => {
-                let errorMessage = "Impossible d'obtenir votre position. Assurez-vous que la localisation est activée et autorisée pour ce site.";
-                if (error.code === error.PERMISSION_DENIED) {
-                    errorMessage = "Vous avez refusé l'accès à la localisation. Impossible de trouver le lieu le plus proche. (Rappel : Nécessite HTTPS)";
-                }
-                addMessage(`❌ Erreur de géolocalisation : ${errorMessage}`, 'bot');
+                console.warn("Erreur de géolocalisation:", error.message);
+                // Ne rien faire, la localisation est optionnelle
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
             }
         );
     } else {
-        addMessage("❌ Votre navigateur ne supporte pas la géolocalisation.", 'bot');
+        console.warn("La géolocalisation n'est pas supportée par ce navigateur.");
     }
 }
 
-function searchNearby(keyword, location) {
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=$${encodeURIComponent(keyword)}&query_place_id=&center=${location.lat},${location.lng}&zoom=15`;
 
-    const responseHTML = `
-        <p>🌍 Voici le résultat de la recherche **"${keyword}"** près de votre position :</p>
-        <a href="${mapsUrl}" target="_blank" class="custom-btn mt-2">
-            <i class="bi bi-geo-alt-fill"></i> Afficher sur Google Maps
-        </a>
-    `;
-    addMessage(responseHTML, 'bot');
-}
-
-
-function normalizeKeyword(word) {
-    if (word.endsWith('s') && word.length > 3) {
-        return word.slice(0, -1);
-    }
-    if (word.includes('informaticien')) {
-        return 'informatique';
-    }
-    return word;
-}
-
-
-function getKeywords(query) {
-    const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2);
-    let keywordActivite = null;
-    let keywordVille = null;
-    let keywordGeo = null; 
-
-    for (const word of words) {
-        const normalizedWord = normalizeKeyword(word);
-
-        if (ALL_CITIES.includes(word)) { 
-            keywordVille = word;
-        }
+/**
+ * Charge les données des professionnels depuis Google Sheets.
+ */
+async function loadProfessionalData() {
+    console.log("Chargement des données...");
+    try {
+        const response = await fetch(SHEET_API_URL);
+        const text = await response.text();
         
-        if (GEO_KEYWORDS.includes(normalizedWord)) {
-            keywordGeo = normalizedWord;
-        }
+        // La réponse Gviz est un wrapper JavaScript, il faut l'extraire
+        const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
+        const data = JSON.parse(jsonText);
 
-        const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
-                                    ALL_SPECIALTIES.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
-                                    ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
-
-        if (isSectorOrSpecialty) {
-            keywordActivite = normalizedWord; 
-        }
-    }
-    
-    if (!keywordActivite && !keywordGeo) {
-        const excludedWords = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'plus', 'proche', 'moi'];
-        const firstRelevantWord = words.find(w => w.length > 2 && !excludedWords.includes(w) && !ALL_CITIES.includes(w) && !GEO_KEYWORDS.includes(w));
-        if (firstRelevantWord) {
-            keywordActivite = normalizeKeyword(firstRelevantWord);
-        }
-    }
-
-    return { activite: keywordActivite, ville: keywordVille, geo: keywordGeo };
-}
-
-function processBotResponse(query) {
-    const lowerQuery = query.toLowerCase();
-    const { activite: activiteKeyword, ville: villeKeyword, geo: geoKeyword } = getKeywords(query);
-    
-    const isNearbyQuery = lowerQuery.includes('plus proche') && geoKeyword;
-    
-    if (isNearbyQuery) {
-        askForGeolocation(geoKeyword);
-        return;
-    }
-
-    if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('recherche') || lowerQuery.includes('un') || lowerQuery.includes('une') || activiteKeyword) {
-
-        if (!activiteKeyword && !villeKeyword) {
-            addMessage("Veuillez être plus précis. Quelle **Activité** et dans quelle **Ville** ? **Exemple : Plombier à Cotonou.**", 'bot');
-            return;
-        }
-
-        let results = searchProfessionals(query, activiteKeyword, villeKeyword, false);
-
-        if (results.length === 0 && villeKeyword) {
-             results = searchProfessionals(query, activiteKeyword, villeKeyword, true);
-        }
-
-        displayResults(results, activiteKeyword, villeKeyword);
-
-    } else if (lowerQuery.includes('bonjour') || lowerQuery.includes('salut') || lowerQuery.includes('hello')) {
-        addMessage("Salut ! Je suis ProFinder. La règle pour la recherche est simple : **[Activité] à [Ville]**. Pour les lieux, essayez : **[Banque] le plus proche de moi**.", 'bot');
-    } else {
-        addMessage("Je n'ai pas compris. Veuillez utiliser le format simple : **[Activité] à [Ville]** ou **[Lieu] le plus proche de moi**.", 'bot');
-    }
-}
-
-function searchProfessionals(query, activite, ville, degrade = false) {
-    if (proData.length === 0) return [];
-
-    const queryWords = query ? query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2).map(normalizeKeyword) : [];
-
-    return proData.filter(pro => {
-        let matchActivite = false;
-        let matchVille = false;
+        const rows = data.table.rows;
+        const cols = data.table.cols;
         
-        const proActivite = pro.activite.toLowerCase();
-        const proSecteur = pro.secteur.toLowerCase();
-        const proVille = pro.ville.toLowerCase();
-        const proQuartier = pro.quartier.toLowerCase();
+        // Récupérer les noms de colonnes du premier row (l'en-tête)
+        // Les noms des colonnes sont dans la propriété 'label'
+        const columnLabels = cols.map(c => c.label);
 
-        // 1. Logique d'Activité
-        if (activite) {
-            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
-                            queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
-        } else {
-            matchActivite = true; 
-        }
-        
-        // 2. Logique de Ville/Quartier (Dégradation)
-        if (ville) {
-            if (degrade) {
-                // Recherche dégradée : Ville uniquement
-                matchVille = proVille.includes(ville);
-            } else {
-                // Recherche stricte : Ville OU (Ville + Quartier)
-                const fullLocation = proVille + ' ' + proQuartier;
-                matchVille = fullLocation.includes(query.toLowerCase()) || proVille.includes(ville);
+        // Transformation des données
+        proData = rows.map(row => {
+            let pro = {};
+            row.c.forEach((cell, index) => {
+                const label = columnLabels[index];
+                let value = cell ? (cell.v !== undefined ? cell.v : cell.f) : null;
+                
+                // Normalisation des clés pour la recherche
+                const keyMapping = {
+                    'Timestamp': 'timestamp',
+                    'Nom de l\'Entreprise': 'nom_entreprise',
+                    'Contact WhatsApp': 'contact_whatsapp',
+                    'Contact Téléphonique': 'contact_telephone',
+                    'Ville de Base': 'ville',
+                    'Quartier / Localisation': 'quartier',
+                    'Indication GPS': 'indication_gps',
+                    'Secteur Général': 'secteur',
+                    'Activité Détaillée': 'activite_detaillee',
+                    'Expérience (ans)': 'experience_ans',
+                    'Prix Min (FCFA)': 'prix_min',
+                    'Prix Max (FCFA)': 'prix_max',
+                    'Note/Avis': 'note_avis',
+                    'Vérification (Oui/Non)': 'verification',
+                    'Consentement Contact': 'contact_consent',
+                    // Ajouter le mapping si le nom de l'activité est séparé
+                    // On utilise 'activite_detaillee' comme 'activite' principale pour la recherche
+                    // Ajout d'une clé simple 'activite' pour la recherche rapide
+                    'Activité Principale': 'activite' 
+                };
+
+                const key = keyMapping[label] || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
+
+                // Conversion de type pour les nombres
+                if (key === 'note_avis' || key === 'experience_ans') {
+                    value = parseFloat(value) || 0;
+                }
+                
+                // Le nom de l'activité principale est l'activité détaillée (pour l'instant)
+                if (key === 'activite_detaillee' && !pro.activite) {
+                    pro.activite = value;
+                }
+                
+                pro[key] = value;
+            });
+            // Assure que l'activité principale est définie pour la recherche si elle ne l'est pas
+            if (!pro.activite) {
+                pro.activite = pro.activite_detaillee;
             }
-        } else {
-            matchVille = true;
-        }
+            return pro;
+        }).filter(pro => pro.nom_entreprise); // Filtre les lignes vides
         
-        return matchActivite && matchVille;
-    });
+        console.log(`Données chargées : ${proData.length} professionnels.`);
+        // Note: La première recherche n'est déclenchée que lorsque l'utilisateur tape quelque chose.
+
+    } catch (error) {
+        console.error("Erreur lors du chargement des données de Google Sheet. Vérifiez le SHEET_API_URL et l'accès public:", error);
+        appendMessage("❌ Erreur critique : Impossible de charger les données des professionnels. Veuillez vérifier la console pour plus de détails.", 'ai');
+    }
 }
 
-// Démarrage : chargement des données au lancement
-loadSheetData();
-showPage('home');
 
+// =====================================================================
+// ÉVÉNEMENTS
+// =====================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Initialisation
+    loadProfessionalData();
+    getUserLocation();
+    
+    // 2. Gestion des Boutons
+    startChatBtn.addEventListener('click', () => {
+        navigateTo('chat');
+    });
+    
+    accueilBtnNav.addEventListener('click', () => {
+        navigateTo('home');
+    });
+
+    sendBtn.addEventListener('click', () => {
+        const query = userInput.value.trim();
+        if (query) {
+            processUserQuery(query);
+        }
+    });
+
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendBtn.click();
+        }
+    });
+    
+    // 3. Gestion du bouton "Afficher plus" (Load More)
+    loadMoreBtn.addEventListener('click', () => {
+        displayProfessionals(currentSearchResults, false); // Affiche la page suivante
+    });
+
+    // Gestion du hash URL pour la navigation directe
+    if (window.location.hash === '#chat') {
+        navigateTo('chat');
+    } else {
+        navigateTo('home');
+    }
+});
