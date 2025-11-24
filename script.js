@@ -470,15 +470,18 @@ async function processUserQuery(rawQuery) {
  */
 function navigateTo(page) {
     if (page === 'chat') {
-        homePage.classList.remove('active');
-        chatPage.classList.add('active');
+        // CORRECTION APPLIQUÉE ICI : Utiliser d-none pour le basculement d'affichage
+        homePage.classList.add('d-none');
+        chatPage.classList.remove('d-none');
+        
         // Ajoute un message initial seulement si la boîte est vide
         if (chatBox.children.length === 0) {
             appendMessage("Bonjour ! Je suis ProFinder AI. Cherchez-vous un professionnel dans un domaine particulier ou une information ? (Ex: 'plombier à Cotonou' ou 'taux de change')", 'ai');
         }
     } else {
-        chatPage.classList.remove('active');
-        homePage.classList.add('active');
+        // CORRECTION APPLIQUÉE ICI : Utiliser d-none pour le basculement d'affichage
+        chatPage.classList.add('d-none');
+        homePage.classList.remove('d-none');
     }
 }
 
@@ -636,5 +639,3 @@ document.addEventListener('DOMContentLoaded', () => {
         navigateTo('home');
     }
 });
-
-
