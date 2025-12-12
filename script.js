@@ -1,12 +1,9 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
+// ⚠️ ÉTAPE 1 : URL DU FICHIER GOOGLE SHEET (NE DOIT PAS CHANGER)
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
 // =====================================================================
-// ⚠️ ÉTAPE 2 : REMPLACEZ CETTE URL PAR L'URL DE VOTRE DÉPLOIEMENT APPS SCRIPT !
-// (Celle qui exécute la fonction doPost)
-// =====================================================================
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw01hXYe-IXHJsb-SfufGKFAFczq44-LYV27mfNvdBt8PWUQZGEDUaBYKMS2OO6nd5z/exec'; 
+// L'URL APPS SCRIPT n'est plus nécessaire pour la recherche de professionnels
 // =====================================================================
 
 let proData = []; 
@@ -24,8 +21,7 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU)
-// (La logique de ces listes est conservée pour la détection des mots-clés)
+// LISTES DE RÉFÉRENCE (INCHANGÉES)
 // =====================================================================
 
 const SECTOR_COLUMNS = [
@@ -80,7 +76,7 @@ const GEO_KEYWORDS = [
 
 
 // =====================================================================
-// FONCTIONS DE BASE (INCHANGÉES)
+// FONCTIONS DE BASE (NAVIGATION/AFFICHAGE)
 // =====================================================================
 
 function showPage(pageId) {
@@ -134,7 +130,7 @@ function handleUserQuery() {
     addMessage(query, 'user');
     userInput.value = '';
 
-    // Changement : ProcessBotResponse est maintenant asynchrone
+    // Changement : ProcessBotResponse est maintenant asynchrone pour la phase de chargement si nécessaire
     processBotResponse(query);
 }
 sendBtn.addEventListener('click', handleUserQuery);
@@ -146,32 +142,23 @@ userInput.addEventListener('keypress', (e) => {
 
 
 // =====================================================================
-// FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES (MODIFIÉES)
+// FONCTIONS UTILITAIRES D'AFFICHAGE (INCHANGÉES)
 // =====================================================================
 
-// CORRECTION: Conversion de la note numérique en étoiles HTML (pleines ★ et vides ☆)
 function getStarRating(note) {
-    // S'assurer que la note est un nombre et entre 0 et 5
     const normalizedNote = Math.max(0, Math.min(5, parseFloat(note)));
-    
-    // Arrondir au demi-point le plus proche (ex: 4.3 -> 4.5, 3.2 -> 3.0)
     const roundedNote = Math.round(normalizedNote * 2) / 2; 
 
     let stars = '';
-    
-    // Étoiles pleines (★)
     const fullStars = Math.floor(roundedNote);
     for (let i = 0; i < fullStars; i++) {
         stars += '★'; 
     }
-    
-    // Gérer la demi-étoile (½)
     const hasHalfStar = (roundedNote - fullStars) === 0.5;
     if (hasHalfStar) {
         stars += '½'; 
     }
 
-    // Étoiles vides (☆)
     const emptyStars = 5 - fullStars - (hasHalfStar ? 0.5 : 0);
     for (let i = 0; i < Math.floor(emptyStars); i++) {
         stars += '☆'; 
@@ -180,24 +167,19 @@ function getStarRating(note) {
     return `<span class="star-rating">${stars}</span>`;
 }
 
-// Fonction utilitaire pour formater les nombres en FCFA
 function formatFCFA(number) {
-    if (number === null || isNaN(number)) return '';
-    // Utilisation de fr-FR pour le formatage monétaire ou de nombre avec espaces
+    if (number === null || isNaN(number)) return 'Non spécifié';
     return new Intl.NumberFormat('fr-FR').format(number) + ' FCFA';
 }
 
-// Fonction de tri (La meilleure note ET la meilleure expérience en premier) - Utile si Apps Script n'a pas pu trier
-function sortProfessionals(a, b) {
-    // 1. Priorité à la Note
-    if (b["Note/Avis"] !== a["Note/Avis"]) {
-        return parseFloat(b["Note/Avis"]) - parseFloat(a["Note/Avis"]); // Tri décroissant (meilleure note d'abord)
-    }
-    // 2. Si les notes sont égales, prioriser l'Expérience
-    return parseFloat(b["Experiences (ans)"]) - parseFloat(a["Experiences (ans)"]); // Tri décroissant (plus d'expérience d'abord)
-}
 
-// MISE À JOUR : Chargement des données (uniquement pour le compte initial)
+// =====================================================================
+// MISE À JOUR MAJEURE : GESTION DES DONNÉES EN LOCAL
+// =====================================================================
+
+/**
+ * Charge les données complètes du Google Sheet via l'API Visualization (GViz)
+ */
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
     
@@ -205,56 +187,126 @@ async function loadSheetData() {
         const response = await fetch(SHEET_API_URL);
         const text = await response.text();
         
+        // Nettoyage de la réponse GViz
         const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
         const data = JSON.parse(jsonText);
         
         const rows = data.table.rows;
         
-        // Filtre pour obtenir un compte initial plus précis
-        const ACTIVITY_INDEX = 8; // Basé sur l'index de Activité détaillée dans code.gs (colonne 9)
-        const count = rows.filter(row => row.c && row.c[ACTIVITY_INDEX] && row.c[ACTIVITY_INDEX].v).length;
+        // Mapping des colonnes (basé sur l'ordre de votre feuille)
+        proData = rows.map(row => {
+            const c = row.c;
+            return {
+                nomContact: c[0] ? c[0].v : '',
+                nomEntreprise: c[1] ? c[1].v : '',
+                whatsapp: c[2] ? String(c[2].v) : '',
+                secteur: c[3] ? String(c[3].v).toLowerCase() : '',
+                // c[4] : Date/Timestamp
+                experience: c[5] ? parseInt(c[5].v) : 0,
+                latitude: c[6] ? c[6].v : null,
+                longitude: c[7] ? c[7].v : null,
+                activite: c[8] ? String(c[8].v).toLowerCase() : '', // Activité détaillée
+                ville: c[9] ? String(c[9].v).toLowerCase() : '',
+                quartier: c[10] ? String(c[10].v).toLowerCase() : '',
+                prixMin: c[11] ? parseFloat(c[11].v) : null,
+                prixMax: c[12] ? parseFloat(c[12].v) : null,
+                note: c[13] ? parseFloat(c[13].v) : 0,
+                // c[14] : Visibilité
+                // c[15] : Consentement
+            };
+        }).filter(pro => pro.activite !== ''); // Filtrer les lignes vides ou incomplètes
 
-
-        addMessage(`Données chargées ! **${count}** professionnels sont disponibles.`, 'bot');
+        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot');
 
     } catch (error) {
-        addMessage("❌ Erreur de connexion aux données. Le décompte initial pourrait être erroné.", 'bot');
+        addMessage("❌ Erreur de connexion aux données de l'annuaire. Vérifiez l'URL de la feuille.", 'bot');
         console.error("Erreur de chargement des données :", error);
     }
 }
 
+/**
+ * Recherche locale dans le tableau proData (Remplace Apps Script)
+ */
+function localSearch(activite, ville, quartier) {
+    const activiteLower = activite ? activite.toLowerCase() : null;
+    const villeLower = ville ? ville.toLowerCase() : null;
+    const quartierLower = quartier ? quartier.toLowerCase() : null;
 
-// MISE À JOUR : Affichage des nouvelles informations (Affiche les résultats formatés par Apps Script)
+    let results = [];
+    let searchLevel = 0;
+
+    // Fonction de vérification de l'activité
+    const matchesActivity = (pro) => 
+        !activiteLower || pro.activite.includes(activiteLower) || pro.secteur.includes(activiteLower);
+
+    // --- TENTATIVE 1: Activité + Ville + Quartier ---
+    results = proData.filter(pro => {
+        const matchAct = matchesActivity(pro);
+        const matchVille = !villeLower || pro.ville === villeLower;
+        const matchQuartier = !quartierLower || pro.quartier.includes(quartierLower);
+        return matchAct && matchVille && matchQuartier;
+    });
+    if (results.length > 0) searchLevel = 1;
+
+    // --- TENTATIVE 2: Activité + Ville (si T1 échoue et ville est présente) ---
+    if (results.length === 0 && villeLower) {
+        results = proData.filter(pro => {
+            const matchAct = matchesActivity(pro);
+            const matchVille = pro.ville === villeLower;
+            return matchAct && matchVille;
+        });
+        if (results.length > 0) searchLevel = 2;
+    }
+    
+    // --- TENTATIVE 3: Activité seule (si T2 échoue et activité est présente) ---
+    if (results.length === 0 && activiteLower) {
+        results = proData.filter(matchesActivity);
+        if (results.length > 0) searchLevel = 3;
+    }
+    
+    // Tri (par Note/Avis du meilleur au pire, puis par expérience)
+    results.sort((a, b) => {
+        const noteA = parseFloat(a.note) || 0;
+        const noteB = parseFloat(b.note) || 0;
+        if (noteB !== noteA) return noteB - noteA;
+        
+        const expA = parseInt(a.experience) || 0;
+        const expB = parseInt(b.experience) || 0;
+        return expB - expA; 
+    });
+
+    return results;
+}
+
+
+// MISE À JOUR : Affichage des résultats (utilise maintenant les clés du tableau local)
 function displayResults(results, activite, ville) {
     let responseHTML = '';
     const recherche = `**${activite || 'Professionnel'}** ${ville ? 'à **' + ville + '**' : ''}`;
 
     if (results.length > 0) {
-        // Apps Script a déjà trié les données [cite: 58]
         
         responseHTML += `<p>✅ J'ai trouvé **${results.length}** résultat(s) pour ${recherche}.</p>
                          <p class="small fst-italic">Trié par **Note** et **Expérience**.</p>`;
 
         results.forEach(pro => {
-            // Note: Les clés du PRO sont celles définies dans handleSearchProfessionals de code.gs [cite: 45, 46, 47]
-            const nomAffichage = pro["Nom de l'Entreprise"].trim() ? `${pro["Nom de l'Entreprise"]} (par ${pro["Nom du contact"]})` : pro["Nom du contact"];
-            const quartierInfo = pro.Quartier.trim() ? ` à ${pro.Quartier}` : '';
+            // Utilisation des clés du tableau proData (camelCase)
+            const nomAffichage = pro.nomEntreprise.trim() ? `${pro.nomEntreprise} (par ${pro.nomContact})` : pro.nomContact;
+            const quartierInfo = pro.quartier.trim() ? ` à ${pro.quartier}` : '';
             
             // Badges et Infos Qualité
-            const noteValue = parseFloat(pro["Note/Avis"]) || 0;
+            const noteValue = parseFloat(pro.note) || 0;
             const noteEtoiles = noteValue > 0 ? getStarRating(noteValue) : '';
             
-            // Apps Script ne renvoie pas de champ "Vérifié GPS", on le garde pour l'instant même si Apps Script n'envoie pas cette clé.
-            // On peut supposer que la présence des coordonnées et une note élevée implique la vérification.
             const badgeVerif = (pro.latitude && pro.longitude) ? `<span class="badge-verified ms-2">VÉRIFIÉ GPS</span>` : '';
             
             // AFFICHAGE EXPÉRIENCE 
-            const experienceValue = parseInt(pro["Experiences (ans)"]) || 0;
+            const experienceValue = parseInt(pro.experience) || 0;
             const experience = experienceValue > 0 ? `${experienceValue} an(s)` : 'Nouvelle adhésion';
             
             let prixInfo = 'Non spécifié';
-            const prixMin = parseFloat(pro["Prix Min (FCFA)"]) || null;
-            const prixMax = parseFloat(pro["Prix Max (FCFA)"]) || null;
+            const prixMin = pro.prixMin;
+            const prixMax = pro.prixMax;
 
             if (prixMin !== null && prixMax !== null && prixMin < prixMax) {
                  prixInfo = `${formatFCFA(prixMin)} - ${formatFCFA(prixMax)}`;
@@ -264,8 +316,7 @@ function displayResults(results, activite, ville) {
                 prixInfo = `Jusqu'à : ${formatFCFA(prixMax)}`;
             }
 
-
-            // NOUVEAU: Lien de localisation (Visible si coordonnées et vérification OUI)
+            // NOUVEAU: Lien de localisation 
             const mapLink = (pro.latitude && pro.longitude) ? 
                 `<a href="https://maps.google.com/?q=${pro.latitude},${pro.longitude}" target="_blank" class="location-link mt-2"><i class="bi bi-geo-alt-fill"></i> Voir l'adresse</a>` : '';
 
@@ -273,13 +324,13 @@ function displayResults(results, activite, ville) {
             responseHTML += `
                 <div class="result-card animated-result-card">
                     <p class="mb-0 text-white fw-bold d-flex align-items-center">${nomAffichage} ${badgeVerif}</p>
-                    <p class="mb-1 text-accent small">${pro["Activité détaillée"]} - ${pro.Ville}${quartierInfo}</p>
+                    <p class="mb-1 text-accent small">${pro.activite.toUpperCase()} - ${pro.ville}${quartierInfo}</p>
                     <div class="note-line">
                         <div>${noteEtoiles}</div>
                         <div class="experience-text">Expérience : <span>${experience}</span></div>
                     </div>
                     <p class="price-range">${prixInfo}</p>
-                    ${mapLink} <a href="https://wa.me/${pro.WhatsApp.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
+                    ${mapLink} <a href="https://wa.me/${pro.whatsapp.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
                         <i class="bi bi-whatsapp"></i> Contacter via WhatsApp
                     </a>
                 </div>
@@ -287,7 +338,7 @@ function displayResults(results, activite, ville) {
         });
     } else {
         responseHTML = `<p>😔 Désolé, aucun pro n'a été trouvé pour ${recherche}.</p>
-                        <p>👉 **Conseil :** Essayez d'utiliser uniquement un métier générique (ex: 'Mécanicien') ou le nom de la ville (ex: 'Cotonou').</p>`;
+                        <p>👉 **Conseil :** Essayez d'utiliser uniquement un métier générique (ex: 'Plombier') ou le nom de la ville (ex: 'Cotonou').</p>`;
     }
 
     addMessage(responseHTML, 'bot');
@@ -295,122 +346,9 @@ function displayResults(results, activite, ville) {
 
 
 // =====================================================================
-// FONCTION DE RECHERCHE CÔTÉ SERVEUR (NOUVELLE)
+// FONCTIONS DE DÉTECTION DES MOTS-CLÉS (INCHANGÉES)
 // =====================================================================
 
-async function fetchProfessionalsFromServer(activite, ville, quartier) {
-    addMessage("Recherche des professionnels...", 'bot');
-
-    try {
-        const response = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            // On envoie un corps JSON pour être reconnu par doPost dans code.gs [cite: 11]
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                action: 'search',
-                activite: activite,
-                ville: ville,
-                quartier: quartier
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Erreur HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
-
-        if (data.status === 'success') {
-            return data.results; // Renvoie les résultats filtrés et triés par Apps Script [cite: 58]
-        } else {
-            // Afficher l'erreur du serveur
-            addMessage(`❌ Erreur du serveur lors de la recherche : ${data.message || 'Erreur inconnue.'}`, 'bot');
-            return [];
-        }
-
-    } catch (error) {
-        console.error("Erreur de communication avec Apps Script :", error);
-        addMessage(`❌ Impossible de communiquer avec le service de recherche. Vérifiez l'URL de déploiement (${APPS_SCRIPT_URL}).`, 'bot');
-        return [];
-    }
-}
-
-
-// =====================================================================
-// LOGIQUE DE GÉOLOCALISATION (INCHANGÉE)
-// =====================================================================
-
-function askForGeolocation(keyword) {
-    const message = `
-        <p>Pour trouver le(la) **${keyword}** le plus proche, j'ai besoin d'accéder à votre position actuelle.</p>
-        <p>Acceptez-vous de partager votre localisation ?</p>
-        <button id="geo-yes" class="custom-btn btn-sm me-2">✅ Oui, Partager</button>
-        <button id="geo-no" class="btn btn-sm btn-danger">❌ Non, Annuler</button>
-    `;
-    addMessage(message, 'bot');
-
-    setTimeout(() => {
-        const geoYesBtn = document.getElementById('geo-yes');
-        const geoNoBtn = document.getElementById('geo-no');
-
-        if (geoYesBtn) {
-            geoYesBtn.addEventListener('click', () => {
-                addMessage('... Acquisition de votre position en cours ...', 'bot');
-                getGeolocation(keyword);
-            }, { once: true });
-        }
-        if (geoNoBtn) {
-            geoNoBtn.addEventListener('click', () => {
-                addMessage(`Recherche de **${keyword}** annulée.`, 'bot');
-            }, { once: true });
-        }
-    }, 100);
-}
-
-function getGeolocation(keyword) {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                userLocation = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                addMessage(`Position obtenue : Latitude ${userLocation.lat.toFixed(4)}, Longitude ${userLocation.lng.toFixed(4)}`, 'bot');
-                searchNearby(keyword, userLocation);
-            },
-            (error) => {
-                let errorMessage = "Impossible d'obtenir votre position. Assurez-vous que la localisation est activée et autorisée pour ce site.";
-                if (error.code === error.PERMISSION_DENIED) {
-                    errorMessage = "Vous avez refusé l'accès à la localisation. Impossible de trouver le lieu le plus proche. (Rappel : Nécessite HTTPS)";
-                }
-                addMessage(`❌ Erreur de géolocalisation : ${errorMessage}`, 'bot');
-            }
-        );
-    } else {
-        addMessage("❌ Votre navigateur ne supporte pas la géolocalisation.", 'bot');
-    }
-}
-
-function searchNearby(keyword, location) {
-    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(keyword)}&query_place_id=&center=${location.lat},${location.lng}&zoom=15`;
-
-    const responseHTML = `
-        <p>🌍 Voici le résultat de la recherche **"${keyword}"** près de votre position :</p>
-        <a href="${mapsUrl}" target="_blank" class="custom-btn mt-2">
-            <i class="bi bi-geo-alt-fill"></i> Afficher sur Google Maps
-        </a>
-    `;
-    addMessage(responseHTML, 'bot');
-}
-
-
-// =====================================================================
-// LOGIQUE DE DÉTECTION DES MOTS-CLÉS (MODIFIÉE)
-// =====================================================================
-
-// Tente d'extraire un mot qui ne serait ni une ville ni une activité
 function getQuartierFromQuery(query) {
     const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2);
     const citiesAndKeywords = ALL_CITIES.concat(GEO_KEYWORDS).map(normalizeKeyword);
@@ -430,11 +368,9 @@ function getQuartierFromQuery(query) {
             }
         }
     }
-    return ''; // Aucun quartier détecté
+    return ''; 
 }
 
-
-// Normalisation du mot et détection (Geo et Profinder)
 function normalizeKeyword(word) {
     if (word.endsWith('s') && word.length > 3) {
         return word.slice(0, -1);
@@ -507,12 +443,16 @@ async function processBotResponse(query) {
             return;
         }
 
-        // --- MISE À JOUR MAJEURE : APPEL AU SERVEUR ---
-        // On récupère le quartier si présent dans la requête
+        // --- MISE À JOUR MAJEURE : RECHERCHE LOCALE (SYNCHRONE) ---
+        if (proData.length === 0) {
+            addMessage("Veuillez patienter, les données de l'annuaire ne sont pas encore chargées. Réessayez dans un instant.", 'bot');
+            return;
+        }
+        
         const quartierKeyword = getQuartierFromQuery(query); 
         
-        // Apps Script va gérer la recherche dégradée (Quartier -> Ville -> Activité) 
-        const results = await fetchProfessionalsFromServer(activiteKeyword, villeKeyword, quartierKeyword);
+        // Exécute la recherche et le tri en local
+        const results = localSearch(activiteKeyword, villeKeyword, quartierKeyword);
 
         displayResults(results, activiteKeyword, villeKeyword);
 
@@ -524,7 +464,74 @@ async function processBotResponse(query) {
 }
 
 
+// =====================================================================
+// LOGIQUE DE GÉOLOCALISATION (INCHANGÉE)
+// =====================================================================
+
+function askForGeolocation(keyword) {
+    const message = `
+        <p>Pour trouver le(la) **${keyword}** le plus proche, j'ai besoin d'accéder à votre position actuelle.</p>
+        <p>Acceptez-vous de partager votre localisation ?</p>
+        <button id="geo-yes" class="custom-btn btn-sm me-2">✅ Oui, Partager</button>
+        <button id="geo-no" class="btn btn-sm btn-danger">❌ Non, Annuler</button>
+    `;
+    addMessage(message, 'bot');
+
+    setTimeout(() => {
+        const geoYesBtn = document.getElementById('geo-yes');
+        const geoNoBtn = document.getElementById('geo-no');
+
+        if (geoYesBtn) {
+            geoYesBtn.addEventListener('click', () => {
+                addMessage('... Acquisition de votre position en cours ...', 'bot');
+                getGeolocation(keyword);
+            }, { once: true });
+        }
+        if (geoNoBtn) {
+            geoNoBtn.addEventListener('click', () => {
+                addMessage(`Recherche de **${keyword}** annulée.`, 'bot');
+            }, { once: true });
+        }
+    }, 100);
+}
+
+function getGeolocation(keyword) {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                userLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                addMessage(`Position obtenue : Latitude ${userLocation.lat.toFixed(4)}, Longitude ${userLocation.lng.toFixed(4)}`, 'bot');
+                searchNearby(keyword, userLocation);
+            },
+            (error) => {
+                let errorMessage = "Impossible d'obtenir votre position. Assurez-vous que la localisation est activée et autorisée pour ce site.";
+                if (error.code === error.PERMISSION_DENIED) {
+                    errorMessage = "Vous avez refusé l'accès à la localisation. Impossible de trouver le lieu le plus proche. (Rappel : Nécessite HTTPS)";
+                }
+                addMessage(`❌ Erreur de géolocalisation : ${errorMessage}`, 'bot');
+            }
+        );
+    } else {
+        addMessage("❌ Votre navigateur ne supporte pas la géolocalisation.", 'bot');
+    }
+}
+
+function searchNearby(keyword, location) {
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(keyword)}&query_place_id=&center=${location.lat},${location.lng}&zoom=15`;
+
+    const responseHTML = `
+        <p>🌍 Voici le résultat de la recherche **"${keyword}"** près de votre position :</p>
+        <a href="${mapsUrl}" target="_blank" class="custom-btn mt-2">
+            <i class="bi bi-geo-alt-fill"></i> Afficher sur Google Maps
+        </a>
+    `;
+    addMessage(responseHTML, 'bot');
+}
+
+
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
-
