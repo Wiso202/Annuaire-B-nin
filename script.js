@@ -1,13 +1,10 @@
 // =====================================================================
-// ⚠️ ÉTAPE 1 : URL DU FICHIER GOOGLE SHEET (NE DOIT PAS CHANGER)
+// ⚠️ ÉTAPE 1 : URL DU FICHIER GOOGLE SHEET (Vérifiez qu'elle est correcte)
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
 // =====================================================================
-// L'URL APPS SCRIPT n'est plus nécessaire pour la recherche de professionnels
-// =====================================================================
 
 let proData = []; 
-// Nouvelle variable pour stocker la position de l'utilisateur
 let userLocation = null;
 
 // Éléments DOM (inchangés)
@@ -67,7 +64,6 @@ const ALL_CITIES = [
     'Covè', 'Djidja', 'Ouinhi', 'Za-Kpota', 'Zogbodomey'
 ].map(city => city.toLowerCase()); 
 
-// LISTE ÉTENDUE des lieux à chercher à proximité
 const GEO_KEYWORDS = [
     'banque', 'hôpital', 'pharmacie', 'commissariat', 'poste', 'urgence', 'distributeur', 
     'supermarché', 'restaurant', 'marché', 'école', 'université', 'stade', 'mosquée', 
@@ -130,7 +126,6 @@ function handleUserQuery() {
     addMessage(query, 'user');
     userInput.value = '';
 
-    // Changement : ProcessBotResponse est maintenant asynchrone pour la phase de chargement si nécessaire
     processBotResponse(query);
 }
 sendBtn.addEventListener('click', handleUserQuery);
@@ -177,9 +172,6 @@ function formatFCFA(number) {
 // MISE À JOUR MAJEURE : GESTION DES DONNÉES EN LOCAL
 // =====================================================================
 
-/**
- * Charge les données complètes du Google Sheet via l'API Visualization (GViz)
- */
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
     
@@ -187,13 +179,12 @@ async function loadSheetData() {
         const response = await fetch(SHEET_API_URL);
         const text = await response.text();
         
-        // Nettoyage de la réponse GViz
         const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
         const data = JSON.parse(jsonText);
         
         const rows = data.table.rows;
         
-        // Mapping des colonnes (basé sur l'ordre de votre feuille)
+        // Mapping des colonnes (basé sur l'ordre standard de la feuille)
         proData = rows.map(row => {
             const c = row.c;
             return {
@@ -205,7 +196,7 @@ async function loadSheetData() {
                 experience: c[5] ? parseInt(c[5].v) : 0,
                 latitude: c[6] ? c[6].v : null,
                 longitude: c[7] ? c[7].v : null,
-                activite: c[8] ? String(c[8].v).toLowerCase() : '', // Activité détaillée
+                activite: c[8] ? String(c[8].v).toLowerCase() : '', // Activité détaillée (Index 8)
                 ville: c[9] ? String(c[9].v).toLowerCase() : '',
                 quartier: c[10] ? String(c[10].v).toLowerCase() : '',
                 prixMin: c[11] ? parseFloat(c[11].v) : null,
@@ -225,7 +216,7 @@ async function loadSheetData() {
 }
 
 /**
- * Recherche locale dans le tableau proData (Remplace Apps Script)
+ * Recherche locale (corrigée) dans le tableau proData
  */
 function localSearch(activite, ville, quartier) {
     const activiteLower = activite ? activite.toLowerCase() : null;
@@ -233,20 +224,24 @@ function localSearch(activite, ville, quartier) {
     const quartierLower = quartier ? quartier.toLowerCase() : null;
 
     let results = [];
-    let searchLevel = 0;
-
-    // Fonction de vérification de l'activité
-    const matchesActivity = (pro) => 
-        !activiteLower || pro.activite.includes(activiteLower) || pro.secteur.includes(activiteLower);
-
+    
+    // Fonction de vérification de l'activité (PLUS TOLÉRANTE)
+    const matchesActivity = (pro) => {
+        // Si aucune activité n'est spécifiée, on match tout
+        if (!activiteLower) return true;
+        
+        // Vérifie si l'activité détaillée ou le secteur contient le mot-clé
+        return pro.activite.includes(activiteLower) || pro.secteur.includes(activiteLower);
+    }
+    
     // --- TENTATIVE 1: Activité + Ville + Quartier ---
     results = proData.filter(pro => {
         const matchAct = matchesActivity(pro);
         const matchVille = !villeLower || pro.ville === villeLower;
-        const matchQuartier = !quartierLower || pro.quartier.includes(quartierLower);
+        // On rend le match Quartier plus tolérant (recherche par inclusion)
+        const matchQuartier = !quartierLower || pro.quartier.includes(quartierLower); 
         return matchAct && matchVille && matchQuartier;
     });
-    if (results.length > 0) searchLevel = 1;
 
     // --- TENTATIVE 2: Activité + Ville (si T1 échoue et ville est présente) ---
     if (results.length === 0 && villeLower) {
@@ -255,13 +250,11 @@ function localSearch(activite, ville, quartier) {
             const matchVille = pro.ville === villeLower;
             return matchAct && matchVille;
         });
-        if (results.length > 0) searchLevel = 2;
     }
     
     // --- TENTATIVE 3: Activité seule (si T2 échoue et activité est présente) ---
     if (results.length === 0 && activiteLower) {
         results = proData.filter(matchesActivity);
-        if (results.length > 0) searchLevel = 3;
     }
     
     // Tri (par Note/Avis du meilleur au pire, puis par expérience)
@@ -279,7 +272,6 @@ function localSearch(activite, ville, quartier) {
 }
 
 
-// MISE À JOUR : Affichage des résultats (utilise maintenant les clés du tableau local)
 function displayResults(results, activite, ville) {
     let responseHTML = '';
     const recherche = `**${activite || 'Professionnel'}** ${ville ? 'à **' + ville + '**' : ''}`;
@@ -290,17 +282,14 @@ function displayResults(results, activite, ville) {
                          <p class="small fst-italic">Trié par **Note** et **Expérience**.</p>`;
 
         results.forEach(pro => {
-            // Utilisation des clés du tableau proData (camelCase)
             const nomAffichage = pro.nomEntreprise.trim() ? `${pro.nomEntreprise} (par ${pro.nomContact})` : pro.nomContact;
             const quartierInfo = pro.quartier.trim() ? ` à ${pro.quartier}` : '';
             
-            // Badges et Infos Qualité
             const noteValue = parseFloat(pro.note) || 0;
             const noteEtoiles = noteValue > 0 ? getStarRating(noteValue) : '';
             
             const badgeVerif = (pro.latitude && pro.longitude) ? `<span class="badge-verified ms-2">VÉRIFIÉ GPS</span>` : '';
             
-            // AFFICHAGE EXPÉRIENCE 
             const experienceValue = parseInt(pro.experience) || 0;
             const experience = experienceValue > 0 ? `${experienceValue} an(s)` : 'Nouvelle adhésion';
             
@@ -316,7 +305,6 @@ function displayResults(results, activite, ville) {
                 prixInfo = `Jusqu'à : ${formatFCFA(prixMax)}`;
             }
 
-            // NOUVEAU: Lien de localisation 
             const mapLink = (pro.latitude && pro.longitude) ? 
                 `<a href="https://maps.google.com/?q=${pro.latitude},${pro.longitude}" target="_blank" class="location-link mt-2"><i class="bi bi-geo-alt-fill"></i> Voir l'adresse</a>` : '';
 
@@ -346,24 +334,19 @@ function displayResults(results, activite, ville) {
 
 
 // =====================================================================
-// FONCTIONS DE DÉTECTION DES MOTS-CLÉS (INCHANGÉES)
+// LOGIQUE DE DÉTECTION DES MOTS-CLÉS (AMÉLIORÉE)
 // =====================================================================
 
 function getQuartierFromQuery(query) {
     const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2);
-    const citiesAndKeywords = ALL_CITIES.concat(GEO_KEYWORDS).map(normalizeKeyword);
-
+    // ... (Logique inchangée, elle fonctionne pour le quartier)
     for (const word of words) {
         const normalizedWord = normalizeKeyword(word);
-        
-        // Exclure les villes, les mots-clés de géolocalisation et les mots-clés d'activité
         if (!ALL_CITIES.includes(word) && !GEO_KEYWORDS.includes(normalizedWord)) {
             const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
                                         ALL_SPECIALTIES.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
                                         ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
-            
             if (!isSectorOrSpecialty) {
-                // On suppose que le premier mot non-identifié pourrait être un quartier
                 return word;
             }
         }
@@ -375,6 +358,7 @@ function normalizeKeyword(word) {
     if (word.endsWith('s') && word.length > 3) {
         return word.slice(0, -1);
     }
+    // Clé pour 'informaticien' -> 'informatique'
     if (word.includes('informaticien')) {
         return 'informatique';
     }
@@ -391,17 +375,15 @@ function getKeywords(query) {
     for (const word of words) {
         const normalizedWord = normalizeKeyword(word);
 
-        // 1. Détection de la Ville
         if (ALL_CITIES.includes(word)) { 
             keywordVille = word;
         }
         
-        // 2. Détection de Mot-Clé GÉOLOCALISATION
         if (GEO_KEYWORDS.includes(normalizedWord)) {
             keywordGeo = normalizedWord;
         }
 
-        // 3. Détection de l'Activité (Profinder)
+        // On garde la détection stricte, mais on améliore le fallback
         const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
                                     ALL_SPECIALTIES.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
                                     ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
@@ -411,12 +393,21 @@ function getKeywords(query) {
         }
     }
     
-    // Logique de secours pour l'activité si pas de GEO
+    // NOUVELLE LOGIQUE DE SECOURS ROBUSTE pour l'activité
     if (!keywordActivite && !keywordGeo) {
-        const excludedWords = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'plus', 'proche', 'moi'];
-        const firstRelevantWord = words.find(w => w.length > 2 && !excludedWords.includes(w) && !ALL_CITIES.includes(w) && !GEO_KEYWORDS.includes(w));
-        if (firstRelevantWord) {
-            keywordActivite = normalizeKeyword(firstRelevantWord);
+        const excludedWords = ['cherche', 'trouve', 'besoin', 'recherche', 'un', 'une', 'à', 'de', 'le', 'la', 'les', 'en', 'sur', 'plus', 'proche', 'moi', 'qui', 'fait'];
+        
+        // Trouver le mot le plus pertinent qui n'est pas un mot d'arrêt/ville/géo
+        const potentialActivites = words.filter(w => 
+            w.length > 3 && 
+            !excludedWords.includes(w) && 
+            !ALL_CITIES.includes(w) && 
+            !GEO_KEYWORDS.includes(normalizeKeyword(w))
+        );
+        
+        if (potentialActivites.length > 0) {
+            // Choisir le mot le plus long comme activité potentielle (plus spécifique)
+            keywordActivite = normalizeKeyword(potentialActivites.sort((a, b) => b.length - a.length)[0]);
         }
     }
 
@@ -427,7 +418,6 @@ async function processBotResponse(query) {
     const lowerQuery = query.toLowerCase();
     const { activite: activiteKeyword, ville: villeKeyword, geo: geoKeyword } = getKeywords(query);
     
-    // Vérification de la demande de proximité (Hôpital/Banque le plus proche de moi)
     const isNearbyQuery = lowerQuery.includes('plus proche') && geoKeyword;
     
     if (isNearbyQuery) {
@@ -435,7 +425,6 @@ async function processBotResponse(query) {
         return;
     }
 
-    // Logique de recherche dans l'annuaire (Profinder)
     if (lowerQuery.includes('cherche') || lowerQuery.includes('trouve') || lowerQuery.includes('besoin') || lowerQuery.includes('recherche') || lowerQuery.includes('un') || lowerQuery.includes('une') || activiteKeyword) {
 
         if (!activiteKeyword && !villeKeyword) {
@@ -443,7 +432,7 @@ async function processBotResponse(query) {
             return;
         }
 
-        // --- MISE À JOUR MAJEURE : RECHERCHE LOCALE (SYNCHRONE) ---
+        // Vérification des données chargées
         if (proData.length === 0) {
             addMessage("Veuillez patienter, les données de l'annuaire ne sont pas encore chargées. Réessayez dans un instant.", 'bot');
             return;
