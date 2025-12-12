@@ -13,7 +13,6 @@
 
 body {
     background-color: var(--bg-dark);
-    /* Utilisation de Inter par défaut ou une alternative sans-serif */
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: var(--text-light);
     overflow-x: hidden; 
@@ -31,189 +30,258 @@ body {
 .page-content {
     width: 100%;
     min-height: calc(100vh - 60px); 
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    box-sizing: border-box;
+    padding: 0;
+    transition: opacity 0.5s ease-in-out;
 }
 
-/* Animations de la page d'accueil */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.animated-fade-in {
-    animation: fadeIn 1s ease-out forwards;
+#home-page {
+    background: linear-gradient(180deg, var(--bg-dark) 0%, #000000 100%);
 }
 
-@keyframes popIn {
-    0% { opacity: 0; transform: scale(0.8); }
-    100% { opacity: 1; transform: scale(1); }
-}
-.animated-pop {
-    opacity: 0; 
-    animation: popIn 0.5s ease-out forwards;
-    animation-play-state: paused; /* Démarrage via JS */
-}
-.animated-pop:nth-child(1) { animation-delay: 0.2s; }
-.animated-pop:nth-child(2) { animation-delay: 0.4s; }
-.animated-pop:nth-child(3) { animation-delay: 0.6s; }
-
-/* ----------------- Header ----------------- */
+/* ----------------- Header (Entête Fixe) ----------------- */
 .app-header {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 60px;
-    background-color: var(--bg-dark);
-    border-bottom: 1px solid #1a1a1a;
+    background-color: #000000; 
+    border-bottom: 1px solid #333333;
+    z-index: 1000;
     display: flex;
     align-items: center;
-    padding: 0 20px;
-    z-index: 1000;
+    padding: 0 30px;
 }
 .header-logo {
-    font-size: 1.5rem;
-    font-weight: bold;
+    font-size: 1.4rem;
+    font-weight: 800;
     color: var(--accent-color);
-}
-.header-nav {
-    margin-left: auto;
+    letter-spacing: 1px;
 }
 
-/* ----------------- Page d'Accueil ----------------- */
+/* ----------------- Footer (Pied de Page) ----------------- */
+.app-footer {
+    width: 100%;
+    padding: 20px 0;
+    background-color: #000000;
+    border-top: 1px solid #333333;
+    text-align: center;
+    color: var(--secondary-text);
+    font-size: 0.8rem;
+    margin-top: 50px; 
+}
+
+/* ----------------- Styles de l'Introduction et des Cartes ----------------- */
 .intro-content {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 40px 0;
+    padding: 50px 30px;
 }
 
-.text-accent {
+.feature-card {
+    background: var(--input-bg); 
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    padding: 30px;
+    height: 100%;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    transition: transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.4s ease;
+}
+.feature-card:hover {
+    transform: translateY(-10px); 
+    box-shadow: 0 15px 35px rgba(255, 215, 0, 0.2), 0 0 10px var(--accent-color); 
+    border-color: var(--accent-color);
+}
+.feature-icon {
+    font-size: 3rem;
+    color: var(--accent-color);
+    animation: pulse-icon 1.5s infinite alternate;
+}
+.feature-card h4 {
     color: var(--accent-color);
 }
 
-.btn-primary-custom {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-    color: var(--bg-dark);
-    font-weight: bold;
-    padding: 12px 30px;
+@keyframes pop-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulse-icon {
+    from { transform: scale(1); opacity: 0.8; }
+    to { transform: scale(1.05); opacity: 1; }
+}
+.animated-pop {
+    opacity: 0;
+    animation: pop-in 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    animation-play-state: paused;
+}
+.conversation-simulation-lg {
+    border-left: 5px solid var(--accent-color);
+    background-color: var(--chat-bg);
     border-radius: 8px;
+}
+.sim-message {
+    padding: 8px 15px;
+    border-radius: 20px;
+    max-width: 70%;
+    font-size: 0.9rem;
+}
+.bot-message-sim {
+    background-color: #333333;
+    color: var(--text-light);
+    align-self: flex-start;
+}
+.user-message-sim {
+    background-color: var(--accent-color);
+    color: var(--bg-dark);
+    align-self: flex-end;
+    font-weight: bold;
+}
+.rule-box {
+    border: 1px dashed var(--secondary-text);
+    border-radius: 8px;
+    background-color: #1f1f1f;
+}
+.stat-card {
+    background-color: #000000 !important;
+    border: 2px solid var(--accent-color);
+    border-radius: 15px !important;
+}
+.custom-btn {
+    background-color: var(--accent-color) !important;
+    color: var(--bg-dark) !important;
+    border: none !important;
+    font-weight: bold;
     transition: all 0.3s;
 }
-.btn-primary-custom:hover {
-    background-color: #e5c100;
-    border-color: #e5c100;
-    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
-    transform: translateY(-2px);
+.custom-btn:hover {
+    background-color: #e5c100 !important; 
+    transform: scale(1.02);
 }
 
-.stat-card {
-    background-color: var(--input-bg);
-    border-radius: 10px;
-    padding: 20px;
-    text-align: center;
-    min-height: 150px;
-}
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: var(--accent-color);
-}
-.stat-label {
-    font-size: 1rem;
-    color: var(--secondary-text);
-}
+/* ===================================================================== */
+/* STYLES DU CHAT CONVERSATIONNEL (Mise à jour pour les cartes de résultat) */
+/* ===================================================================== */
 
-
-/* ----------------- Page Chatbot ----------------- */
-#chat-page {
-    /* Utiliser le flex pour gérer l'espace entre le chat et le footer d'input */
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - 60px); /* Prend toute la hauteur disponible */
-    padding: 0; 
-}
-
-/* Zone de la conversation et des résultats */
-.chat-results-area {
-    flex-grow: 1;
-    overflow-y: auto;
-    padding: 20px 20px 0 20px; /* Pas de padding en bas, car l'input prend cet espace */
+.chat-main-block {
+    height: 100vh;
     background-color: var(--chat-bg);
 }
 
-/* --- Style de Message MODERNE --- */
+.chat-header {
+    background-color: #000000 !important;
+    border-bottom: 1px solid var(--accent-color) !important;
+}
+
+.chat-messages {
+    overflow-y: auto;
+    background-color: var(--chat-bg);
+    padding: 20px; /* Plus d'espace autour des messages */
+}
+
+/* --- Bulles de Messages --- */
 .message {
-    max-width: 80%;
-    border-radius: 15px; /* Coins plus arrondis */
-    font-size: 1.05rem;
-    line-height: 1.5;
+    max-width: 85%; /* Plus large pour le contenu des cartes */
+    margin-bottom: 18px; /* Plus d'espace entre les messages */
+    padding: 0; /* Le padding sera sur les bulles internes */
 }
 
-/* Messages Utilisateur */
-.user-message {
-    background-color: #0056b3; /* Bleu plus soutenu */
-    color: var(--text-light);
-    align-self: flex-end; /* Aligné à droite */
-    margin-left: auto;
-    border-bottom-right-radius: 5px; /* Petite coupure sur le coin adjacent */
+/* Bulle du BOT (Réponses standard) */
+.bot-message {
+    background-color: transparent; /* Pas de fond sur l'enveloppe */
+    align-self: flex-start;
 }
-
-/* Messages AI */
-.ai-message {
-    background-color: var(--input-bg); /* Gris sombre pour le bot */
-    color: var(--text-light);
-    align-self: flex-start; /* Aligné à gauche */
-    margin-right: auto;
-    border-bottom-left-radius: 5px; /* Petite coupure sur le coin adjacent */
-}
-
-/* Conteneur des résultats de recherche */
-#pro-list-container {
-    padding-top: 20px; 
-    border-top: 1px solid #333;
-    margin-top: 15px;
-}
-
-.pro-card {
+.bot-message > p { /* Pour les messages texte simples */
     background-color: var(--input-bg);
-    border: 1px solid #333;
-    transition: transform 0.2s, box-shadow 0.2s;
+    padding: 12px 18px;
+    border-radius: 18px;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
-.pro-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), 0 0 10px var(--accent-color);
+
+/* Bulle de l'UTILISATEUR */
+.user-message {
+    background-color: var(--accent-color);
+    color: var(--bg-dark);
+    align-self: flex-end;
+    margin-left: auto;
+    padding: 12px 18px;
+    border-radius: 18px;
+    border-bottom-right-radius: 4px;
+    font-weight: 600;
+    box-shadow: 0 2px 5px rgba(255, 215, 0, 0.3);
 }
-.pro-name {
-    color: var(--accent-color);
-    font-weight: bold;
-    font-size: 1.3rem;
-    margin-bottom: 2px;
+
+/* --- Carte de Résultat --- */
+@keyframes card-fade-in_up {
+    from { opacity: 0; transform: translateY(15px); }
+    to { opacity: 1; transform: translateY(0); }
 }
-.pro-activity {
-    color: var(--secondary-text);
-    font-size: 0.9rem;
-    margin-bottom: 10px;
+.animated-result-card {
+    animation: card-fade-in_up 0.5s ease-out forwards;
 }
-.pro-description {
-    color: var(--text-light);
-    font-size: 0.95rem;
+
+.bot-message .result-card {
+    padding: 20px;
+    margin: 0;
+    max-width: 100%;
+    background-color: #1a1a1a; 
+    border-radius: 12px;
+    border-left: 5px solid var(--accent-color);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.result-card:hover {
+    transform: translateY(-5px) scale(1.01);
+    box-shadow: 0 8px 20px rgba(255, 215, 0, 0.3); 
+}
+
+/* NOUVEAU: Style des étoiles (CORRIGÉ) */
+.star-rating {
+    font-size: 1.2rem;
+    color: var(--accent-color); /* Étoiles en Or */
+    display: inline-block;
+    line-height: 1;
+}
+
+/* NOUVEAU: Ligne pour les notes et l'expérience */
+.note-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 5px;
+    font-size: 0.9rem;
+    padding-bottom: 5px;
+    border-bottom: 1px dashed #333;
+    margin-bottom: 8px;
 }
-.pro-rating-badge {
-    background-color: #38761d; /* Vert vérifié */
-    color: var(--text-light);
-    padding: 5px 10px;
-    border-radius: 5px;
+
+/* NOUVEAU: Texte d'expérience (CORRIGÉ) */
+.experience-text {
+    color: var(--secondary-text); 
+    font-style: normal;
+    font-weight: normal;
+}
+.experience-text span {
     font-weight: bold;
-    font-size: 0.9rem;
+    color: var(--text-light); /* Met en évidence la valeur */
 }
-.verified-badge {
-    color: #38761d;
+
+/* Ligne de prix */
+.price-range {
+    color: #00d287; /* Couleur secondaire pour le prix (Vert) */
     font-size: 0.9rem;
+    margin-bottom: 8px;
+    font-style: italic;
+    font-weight: bold;
+}
+
+/* Badge VÉRIFIÉ GPS */
+.badge-verified {
+    background-color: #38761d; /* Vert foncé */
+    color: #ffffff;
+    padding: 3px 10px;
+    border-radius: 15px;
+    font-size: 0.75rem;
     font-weight: bold;
     display: inline-flex;
     align-items: center;
@@ -245,87 +313,31 @@ body {
     text-decoration: none;
     font-weight: bold;
     margin-top: 10px;
-    transition: color 0.2s;
 }
 .whatsapp-link:hover {
-    color: #1e8449; /* Vert plus sombre */
+    color: var(--accent-color); 
 }
 
-/* --- Zone de Saisie --- */
-.input-area {
-    background-color: var(--bg-dark);
-    border-top: 1px solid #333;
-    padding: 15px 20px;
-    width: 100%;
-    flex-shrink: 0; /* Empêche le rétrécissement */
+/* --- Zone de Saisie (Footer) --- */
+.chat-footer {
+    background-color: #000000 !important;
+    border-top: 1px solid #333333 !important;
 }
-
-.input-area .form-control {
+.custom-input {
     background-color: var(--input-bg);
+    color: var(--text-light);
     border: 1px solid #444;
-    color: var(--text-light);
-    border-radius: 25px; /* Forme de pilule */
-    padding-left: 20px;
-    padding-right: 20px;
 }
-.input-area .form-control:focus {
-    background-color: var(--input-bg);
-    color: var(--text-light);
+.custom-input:focus {
     border-color: var(--accent-color);
     box-shadow: 0 0 0 0.25rem rgba(255, 215, 0, 0.25);
 }
-
-.input-area .btn {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-    color: var(--bg-dark);
-    border-radius: 25px;
-    transition: all 0.3s;
+.custom-btn-send {
+    background-color: var(--accent-color) !important;
+    color: var(--bg-dark) !important;
+    border: none !important;
 }
-.input-area .btn:hover {
-    background-color: #e5c100;
-    border-color: #e5c100;
+.custom-btn-send:hover {
+    background-color: #e5c100 !important;
 }
 
-/* Bouton Load More */
-#load-more-btn {
-    background-color: #333;
-    border-color: #444;
-    color: var(--secondary-text);
-    transition: all 0.3s;
-}
-#load-more-btn:hover {
-    background-color: #444;
-    color: var(--text-light);
-    border-color: #555;
-}
-
-
-/* ----------------- Responsive (Mobile First) ----------------- */
-@media (max-width: 767.98px) {
-    .intro-content {
-        padding: 20px;
-    }
-    .display-2 {
-        font-size: 2.5rem;
-    }
-    .display-4 {
-        font-size: 1.8rem;
-    }
-    
-    .chat-results-area {
-        padding: 10px 10px 0 10px;
-    }
-    
-    .message {
-        font-size: 0.95rem;
-        max-width: 90%;
-    }
-    
-    .pro-card {
-        padding: 15px !important;
-    }
-    .pro-name {
-        font-size: 1.1rem;
-    }
-}
