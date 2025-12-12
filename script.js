@@ -6,7 +6,7 @@ const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTag
 // ⚠️ ÉTAPE 2 : REMPLACEZ CETTE URL PAR L'URL DE VOTRE DÉPLOIEMENT APPS SCRIPT !
 // (Celle qui exécute la fonction doPost)
 // =====================================================================
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQvP1nTpv4uN3cwBLqJ1ySkUaHnn9u8aapAiB2DnHW1_r-3vfeFxzVrNRzKk04PmAj/exec'; 
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw01hXYe-IXHJsb-SfufGKFAFczq44-LYV27mfNvdBt8PWUQZGEDUaBYKMS2OO6nd5z/exec'; 
 // =====================================================================
 
 let proData = []; 
@@ -527,3 +527,4 @@ async function processBotResponse(query) {
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
+
