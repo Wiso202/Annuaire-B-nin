@@ -1,12 +1,19 @@
 // =====================================================================
 // ⚠️ ÉTAPE 1 : REMPLACEZ CETTE URL PAR L'URL OBTENUE DE VOTRE GOOGLE SHEET
+// Ceci charge TOUTES les données en front-end pour la recherche
+// (Méthode plus rapide pour les petits/moyens annuaires)
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
 // =====================================================================
+// ⚠️ ÉTAPE 2 (Optionnel) : URL de déploiement Apps Script pour l'inscription (et la recherche si vous utilisez Apps Script pour la recherche)
+// Si vous préférez la recherche côté Apps Script, décommentez et remplacez par votre URL de déploiement
+// const APPS_SCRIPT_URL = 'VOTRE_URL_DEPLOIEMENT_APPS_SCRIPT_ICI';
+// =====================================================================
+
 
 let proData = []; 
-// Nouvelle variable pour stocker la position de l'utilisateur
 let userLocation = null;
+const MAPS_BASE_URL = 'https://www.google.com/maps/search/';
 
 // Éléments DOM
 const chatBox = document.getElementById('chat-box');
@@ -20,475 +27,368 @@ const proListContainer = document.getElementById('pro-list-container');
 const loadMoreBtn = document.getElementById('load-more-btn');
 
 // État de la recherche
-let currentSearchResults = []; // Les professionnels qui correspondent à la recherche actuelle
-let professionalsPerPage = 5; // Nombre de pros à afficher par page
-let currentPage = 0; // Page actuelle
-let currentQuery = ''; // Dernière requête utilisateur pour le mode conversationnel
+let currentSearchResults = []; 
+let professionalsPerPage = 5; 
+let currentPage = 0; 
+let currentQuery = ''; 
+let isAwaitingGeoResponse = false; // Pour gérer la réponse de géolocalisation
 
 // =====================================================================
-// LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU)
-// =====================================================================
-
-const SECTOR_COLUMNS = [
-    'Finance / Assurance', 'Transport / Logistique', 'Communication / Médias', 
-    'Tourisme / Loisirs', 'Services à la personne', 'Agriculture / Élevage / Pêche', 
-    'Droit / Juridique', 'Art / Culture / Divertissement'
-    // Les autres secteurs sont gérés par le secteur général 'Autres'
-];
-
-const GEO_KEYWORDS = {
-    // Villes principales (clés de recherche)
-    'cotonou': ['cotonou', 'calavi', 'abomey-calavi', 'porto-novo', 'parakou'],
-    'parakou': ['parakou', 'kandi', 'natitingou'],
-    // ... ajouter d'autres villes ou régions clés si nécessaire
-    // Mots clés de localisation générale
-    'ville': ['ville', 'localité', 'où', 'dans quel endroit', 'proche', 'autour', 'quartier'],
-    'region': ['région', 'zone', 'département', 'pays'],
-    'proche': ['près', 'proximité', 'proche', 'aux alentours', 'à côté', 'autour']
-};
-
-const ACTION_KEYWORDS = {
-    'search': ['cherche', 'trouve', 'recherche', 'besoin', 'recommander', 'recommande', 'un pro', 'un professionnel'],
-    'contact': ['contacter', 'numéro', 'appel', 'téléphone', 'whatsapp', 'joindre', 'parler à'],
-    'prix': ['prix', 'tarif', 'coût', 'cher', 'combien'],
-    'avis': ['avis', 'note', 'réputation', 'meilleur'],
-    'localiser': ['où est-il', 'localiser', 'adresse', 'position'],
-};
-
-// =====================================================================
-// FONCTIONS UTILITAIRES DE NETTOYAGE ET D'AFFICHAGE
+// FONCTIONS D'INTERFACE ET DE NAVIGATION
 // =====================================================================
 
 /**
- * Normalise une chaîne de caractères pour faciliter la recherche (minuscules, sans accents).
- * @param {string} str - La chaîne à normaliser.
- * @returns {string} - La chaîne normalisée.
+ * Change l'affichage entre la page d'accueil et le chatbot.
+ * @param {string} page 'home' ou 'chat'
  */
-function normalizeKeyword(str) {
-    if (typeof str !== 'string') return '';
-    return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
-
-/**
- * Affiche un message dans la boîte de dialogue (chat).
- * @param {string} message - Le message à afficher.
- * @param {string} sender - L'expéditeur ('user' ou 'ai').
- */
-function appendMessage(message, sender) {
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('chat-message', `${sender}-message`);
-    
-    // Remplacement du texte de l'AI pour inclure un lien de retour d'accueil si nécessaire
-    if (sender === 'ai') {
-        message = message.replace(/\[accueil\]/g, '<a href="#" id="ai-home-link" class="text-accent fw-bold text-decoration-none">Accueil</a>');
-    }
-    
-    messageElement.innerHTML = `
-        <div class="message-bubble ${sender === 'ai' ? 'bg-secondary' : 'bg-primary'} p-3 rounded-lg shadow-sm">
-            ${message}
-        </div>
-    `;
-    chatBox.appendChild(messageElement);
-    chatBox.scrollTop = chatBox.scrollHeight; // Scroll vers le bas
-    
-    // Ajout d'un écouteur d'événement pour le lien Accueil dans le message AI
-    if (sender === 'ai' && message.includes('ai-home-link')) {
-        document.getElementById('ai-home-link')?.addEventListener('click', (e) => {
-            e.preventDefault();
-            navigateTo('home');
-        });
+function navigateTo(page) {
+    if (page === 'chat') {
+        homePage.classList.add('d-none');
+        chatPage.classList.remove('d-none');
+        window.location.hash = '#chat';
+        userInput.focus();
+        if (chatBox.children.length === 0) {
+            // Premier message du bot
+            appendMessage("Bonjour ! Je suis ProFinder, votre assistant pour trouver les meilleurs professionnels. Comment puis-je vous aider ?", 'ai');
+        }
+    } else {
+        homePage.classList.remove('d-none');
+        chatPage.classList.add('d-none');
+        window.location.hash = '#home';
     }
 }
 
 /**
- * Construit et affiche la carte d'un professionnel.
- * @param {object} pro - L'objet professionnel.
- * @param {boolean} highlight - Indique si le résultat doit être mis en évidence (nouveau).
- * @returns {string} - Le HTML de la carte du professionnel.
+ * Ajoute un message au chatbox avec un style de bulle moderne.
+ * @param {string} text Le contenu du message (peut contenir du HTML)
+ * @param {string} sender 'user' ou 'ai'
  */
-function createProCard(pro, highlight = false) {
-    const contactMethod = pro.contact_whatsapp || pro.contact_telephone;
-    const whatsappLink = pro.contact_whatsapp ? `https://wa.me/${pro.contact_whatsapp.replace(/\D/g, '')}` : null;
-    const isVerified = pro.verification === 'Oui';
-    const hasGps = pro.indication_gps && pro.indication_gps !== 'Non renseigné' && pro.indication_gps !== 'Non';
+function appendMessage(text, sender) {
+    const messageDiv = document.createElement('div');
+    messageDiv.classList.add('message', `${sender}-message`, 'p-3', 'mb-2', 'rounded-lg');
+    messageDiv.innerHTML = text; 
     
-    // Déterminer la classe de couleur de la note (vert, orange, rouge)
-    let ratingColor = 'text-gray-400';
-    if (pro.note_avis >= 4.5) {
-        ratingColor = 'text-green-500';
-    } else if (pro.note_avis >= 3.0) {
-        ratingColor = 'text-yellow-500';
-    } else if (pro.note_avis > 0) {
-        ratingColor = 'text-red-500';
-    }
+    // Ajout d'une petite animation à l'apparition
+    messageDiv.style.opacity = 0;
+    messageDiv.style.transform = 'translateY(10px)';
     
-    const ratingDisplay = pro.note_avis > 0 
-        ? `<i class="bi bi-star-fill ${ratingColor} me-1"></i> ${pro.note_avis.toFixed(1)}` 
-        : '<span class="text-gray-400">Pas encore noté</span>';
-    
-    const verificationBadge = isVerified ? 
-        `<span class="verified-badge"><i class="bi bi-patch-check-fill me-1"></i> Vérifié</span>` : 
-        '';
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-    const locationLink = hasGps ?
-        `<a href="${pro.indication_gps}" target="_blank" class="location-link"><i class="bi bi-geo-alt-fill me-1"></i> Voir sur la carte</a>` :
-        `<span class="text-gray-500"><i class="bi bi-geo-alt me-1"></i> Localisation : ${pro.ville}, ${pro.quartier}</span>`;
-
-    const priceRange = (pro.prix_min && pro.prix_max) && (pro.prix_min !== 'Non renseigné' || pro.prix_max !== 'Non renseigné') 
-        ? `<div class="text-sm text-secondary-text mt-2"><i class="bi bi-currency-dollar me-1"></i> Prix indicatif : ${pro.prix_min} - ${pro.prix_max} FCFA</div>`
-        : '';
-
-    return `
-        <div class="pro-card ${highlight ? 'highlight-card' : ''} p-4 mb-4 rounded-lg shadow-xl animated-pop" data-delay="0s">
-            <h3 class="card-title text-accent mb-2 d-flex align-items-center">
-                ${pro.nom_entreprise} ${verificationBadge}
-            </h3>
-            <p class="card-subtitle text-secondary-text mb-2">${pro.activite} (${pro.secteur})</p>
-            
-            <div class="card-meta d-flex justify-content-between align-items-center mb-3">
-                <span class="rating-display">${ratingDisplay}</span>
-                <span class="text-sm text-gray-400"><i class="bi bi-clock-fill me-1"></i> Expérience : ${pro.experience_ans} an(s)</span>
-            </div>
-            
-            <p class="card-description">${pro.activite_detaillee}</p>
-            
-            ${priceRange}
-            
-            <div class="card-footer mt-3 pt-3 border-t border-gray-700">
-                ${locationLink}
-                ${whatsappLink ? 
-                    `<a href="${whatsappLink}" target="_blank" class="whatsapp-link">
-                        <i class="bi bi-whatsapp me-1"></i> Contacter par WhatsApp
-                    </a>` : 
-                    `<span class="text-sm text-gray-500">Contact : ${contactMethod || 'Non Public'}</span>`
-                }
-            </div>
-        </div>
-    `;
+    setTimeout(() => {
+        messageDiv.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        messageDiv.style.opacity = 1;
+        messageDiv.style.transform = 'translateY(0)';
+    }, 10); 
 }
 
 /**
- * Affiche la liste paginée des professionnels.
- * @param {Array<object>} results - Le tableau des professionnels à afficher.
- * @param {boolean} isInitialSearch - Indique si c'est la première fois qu'on affiche les résultats pour une nouvelle requête.
+ * Affiche les résultats de la recherche dans le conteneur de liste des professionnels.
+ * @param {Array} results Liste des objets professionnels.
+ * @param {boolean} reset Si true, efface les résultats précédents et réinitialise la pagination.
  */
-function displayProfessionals(results, isInitialSearch = true) {
-    if (isInitialSearch) {
+function displayProfessionals(results, reset = true) {
+    if (reset) {
         proListContainer.innerHTML = '';
-        currentPage = 0;
         currentSearchResults = results;
-    }
-    
-    if (results.length === 0 && isInitialSearch) {
-        proListContainer.innerHTML = '<p class="text-secondary-text text-center mt-5">Aucun professionnel trouvé pour cette recherche.</p>';
-        loadMoreBtn.style.display = 'none';
-        return;
+        currentPage = 0;
     }
 
     const startIndex = currentPage * professionalsPerPage;
     const endIndex = startIndex + professionalsPerPage;
     const prosToDisplay = currentSearchResults.slice(startIndex, endIndex);
 
-    prosToDisplay.forEach((pro, index) => {
-        // Met en évidence uniquement le premier résultat de la première page
-        const highlight = (isInitialSearch && index === 0); 
-        proListContainer.innerHTML += createProCard(pro, highlight);
-    });
+    if (prosToDisplay.length === 0 && reset) {
+        proListContainer.innerHTML = '<div class="alert alert-warning">Aucun résultat trouvé pour votre recherche.</div>';
+    } else if (prosToDisplay.length > 0) {
+        prosToDisplay.forEach(pro => {
+            // Création du lien WhatsApp
+            const whatsappNumber = pro['Numéro WhatsApp'].replace(/\s/g, ''); 
+            const whatsappLink = `https://wa.me/${whatsappNumber}?text=Bonjour%2C%20je%20vous%20contacte%20via%20ProFinder%20suite%20à%20ma%20recherche%20de%20%27${pro['Activité']}%27%20à%20%27${pro['Ville/Région']}%27.`;
+
+            // Création du lien de localisation
+            const locationLink = createMapLink(pro);
+
+            const proCard = document.createElement('div');
+            proCard.classList.add('pro-card', 'p-4', 'mb-3', 'rounded-lg', 'shadow-lg', 'animated-card');
+            proCard.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h5 class="pro-name">${pro['Nom/Prénom']} ${pro['Vérifié'] === 'Oui' ? '<span class="verified-badge"><i class="bi bi-patch-check-fill me-1"></i> Vérifié</span>' : ''}</h5>
+                        <p class="pro-activity">${pro['Activité']} - ${pro['Ville/Région']}</p>
+                    </div>
+                    <div class="pro-rating-badge">
+                        ${pro['Note/Avis'] || 'N/A'} <i class="bi bi-star-fill ms-1"></i>
+                    </div>
+                </div>
+                <p class="pro-description">${pro['Description de l\'Activité'] || 'Pas de description fournie.'}</p>
+                ${locationLink}
+                <a href="${whatsappLink}" target="_blank" class="whatsapp-link">
+                    <i class="bi bi-whatsapp me-2"></i> Contacter par WhatsApp
+                </a>
+            `;
+            proListContainer.appendChild(proCard);
+        });
+
+        currentPage++;
+    }
 
     // Gestion du bouton "Afficher plus"
     if (endIndex < currentSearchResults.length) {
-        loadMoreBtn.style.display = 'block';
+        loadMoreBtn.classList.remove('d-none');
+        loadMoreBtn.textContent = `Afficher ${Math.min(professionalsPerPage, currentSearchResults.length - endIndex)} résultats de plus`;
     } else {
-        loadMoreBtn.style.display = 'none';
+        loadMoreBtn.classList.add('d-none');
     }
-    
-    currentPage++; // Incrémenter la page pour le prochain chargement
 }
+
+/**
+ * Crée le lien Google Maps pour un professionnel.
+ * @param {Object} pro L'objet professionnel.
+ * @returns {string} Le HTML du lien Google Maps.
+ */
+function createMapLink(pro) {
+    if (pro.Latitude && pro.Longitude) {
+        const query = `${pro['Nom/Prénom']}, ${pro['Activité']}, ${pro['Adresse']}`;
+        const mapLink = `${MAPS_BASE_URL}?api=1&query=${pro.Latitude},${pro.Longitude}`;
+        return `<a href="${mapLink}" target="_blank" class="location-link"><i class="bi bi-geo-alt-fill me-1"></i> Voir sur la carte</a>`;
+    }
+    return '';
+}
+
 
 // =====================================================================
-// FONCTIONS D'ANALYSE DU LANGAGE NATUREL
+// GESTION DES DONNÉES ET DE LA RECHERCHE
 // =====================================================================
 
 /**
- * Extrait le mot-clé principal de l'activité.
- * @param {string} query - La requête utilisateur.
- * @returns {string} - Le mot-clé d'activité normalisé.
+ * Récupère les données brutes de la Google Sheet via gviz/tq.
  */
-function extractActivity(query) {
-    const normalizedQuery = normalizeKeyword(query);
-    
-    // Tente de trouver un mot-clé qui correspond à un secteur ou une colonne connue.
-    const activityKeywords = SECTOR_COLUMNS.map(normalizeKeyword);
-    for (const keyword of activityKeywords) {
-        if (normalizedQuery.includes(keyword)) {
-            return keyword;
-        }
-    }
-    
-    // Si aucun secteur connu n'est trouvé, retourne le premier nom/verbe significatif (heuristique simple)
-    const actionWords = Object.values(ACTION_KEYWORDS).flat().map(normalizeKeyword);
-    const stopWords = ['de', 'du', 'des', 'le', 'la', 'les', 'un', 'une', 'des', 'je', 'veux', 'cherche', 'trouve', 'pour', 'qui', 'est', 'sont'];
-    
-    const words = normalizedQuery.split(/\s+/).filter(word => word.length > 2 && !stopWords.includes(word) && !actionWords.includes(word));
-    
-    return words[0] || normalizedQuery; // Retourne le premier mot significatif, ou la requête entière par défaut
-}
-
-/**
- * Extrait les mots-clés de localisation.
- * @param {string} query - La requête utilisateur.
- * @returns {{ville: string|null, degrade: boolean}} - L'objet de localisation.
- */
-function extractLocation(query) {
-    const normalizedQuery = normalizeKeyword(query);
-    let ville = null;
-    let degrade = false; // Flag pour indiquer une recherche de proximité ou dégradée
-    
-    // 1. Recherche de villes spécifiques
-    for (const cityKey in GEO_KEYWORDS) {
-        if (GEO_KEYWORDS[cityKey].some(k => normalizedQuery.includes(k))) {
-            ville = cityKey;
-            break;
-        }
-    }
-
-    // 2. Recherche de proximité (active la recherche dégradée)
-    if (GEO_KEYWORDS.proche.some(k => normalizedQuery.includes(k))) {
-        degrade = true;
-    }
-    
-    // 3. Si aucune ville spécifique n'est trouvée, essaie de prendre le dernier mot comme ville
-    if (!ville) {
-        const words = normalizedQuery.split(/\s+/).filter(w => w.length > 2);
-        if (words.length > 0) {
-            // Option 1: Considérer les 1 ou 2 derniers mots comme la ville/quartier potentielle
-            const lastWords = words.slice(-2).join(' '); 
-            ville = lastWords; 
-        }
-    }
-    
-    return { ville, degrade };
-}
-
-/**
- * Fonction principale de recherche des professionnels.
- * @param {string} query - La requête utilisateur.
- * @returns {Array<object>} - Tableau des professionnels correspondants.
- */
-function searchProfessionals(query) {
-    // 1. Extraction des mots-clés
-    const activite = extractActivity(query);
-    const { ville, degrade } = extractLocation(query);
-
-    // Mots-clés de la requête (nettoyés)
-    const queryWords = query ? query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2).map(normalizeKeyword) : [];
-
-    return proData.filter(pro => {
-        let matchActivite = false;
-        let matchVille = false;
-        
-        const proActivite = normalizeKeyword(pro.activite);
-        const proSecteur = normalizeKeyword(pro.secteur);
-        const proVille = normalizeKeyword(pro.ville);
-        const proQuartier = normalizeKeyword(pro.quartier);
-
-        // 1. Logique d'Activité
-        if (activite) {
-            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
-                            queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
-        } else {
-            matchActivite = true; // Si aucune activité n'est spécifiée, le filtre d'activité passe
-        }
-        
-        // 2. Logique de Ville/Quartier (Dégradation)
-        if (ville) {
-            if (degrade) {
-                // Recherche dégradée (proximité) : Ville uniquement
-                matchVille = proVille.includes(ville);
-            } else {
-                // Recherche stricte : Ville OU (Ville + Quartier)
-                const fullLocation = proVille + ' ' + proQuartier;
-                matchVille = fullLocation.includes(normalizeKeyword(query)) || proVille.includes(ville);
-            }
-        } else {
-            matchVille = true; // Si aucune ville n'est spécifiée, le filtre de ville passe
-        }
-        
-        return matchActivite && matchVille;
-    });
-}
-
-// =====================================================================
-// FONCTIONS DE GESTION DE L'API GEMINI (Recherche et Conversation)
-// =====================================================================
-
-// Laissez apiKey vide; le framework Canvas le fournira au runtime.
-const GEMINI_API_KEY = ""; 
-const GEMINI_API_URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
-const MAX_RETRIES = 5;
-
-/**
- * Fonction pour appeler l'API Gemini avec gestion des tentatives.
- * @param {object} payload - Le corps de la requête JSON.
- * @returns {Promise<object>} - La réponse JSON de l'API.
- */
-async function callGeminiApi(payload) {
-    let lastError = null;
-    for (let i = 0; i < MAX_RETRIES; i++) {
-        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000; // Délai exponentiel avec jitter
-        if (i > 0) await new Promise(resolve => setTimeout(resolve, delay));
-
-        try {
-            const url = `${GEMINI_API_URL_BASE}?key=${GEMINI_API_KEY}`;
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (response.ok) {
-                return response.json();
-            } else if (response.status === 429 || response.status >= 500) {
-                // Erreur de taux limité ou erreur serveur, on retente
-                lastError = `Erreur API: ${response.status} ${response.statusText}`;
-                console.warn(`Tentative ${i + 1} échouée. Retraitement dans ${delay / 1000}s.`, lastError);
-            } else {
-                // Erreur client irrécupérable
-                const errorBody = await response.json();
-                throw new Error(`Erreur API irrécupérable: ${response.status} - ${errorBody.error?.message || response.statusText}`);
-            }
-        } catch (error) {
-            lastError = error;
-            console.error(`Erreur lors de la tentative ${i + 1}:`, error);
-        }
-    }
-    // Si toutes les tentatives ont échoué
-    throw new Error(`Échec de l'appel API après ${MAX_RETRIES} tentatives: ${lastError ? lastError.message || lastError : 'Erreur inconnue'}`);
-}
-
-
-/**
- * Analyse la requête utilisateur pour déterminer s'il s'agit d'une recherche ou d'une question.
- * Puis, génère une réponse AI basée sur les résultats de la recherche interne et/ou Gemini.
- * @param {string} rawQuery - La requête utilisateur non traitée.
- */
-async function processUserQuery(rawQuery) {
-    appendMessage(rawQuery, 'user');
-    userInput.value = '';
-    currentQuery = rawQuery; // Stocke la requête pour les interactions futures
-
-    // 1. Recherche interne des professionnels
-    const searchResults = searchProfessionals(rawQuery);
-    
-    // 2. Afficher la liste des professionnels
-    displayProfessionals(searchResults, true);
-
-    // 3. Préparation du prompt pour Gemini
-    let prompt;
-    let systemInstruction;
-
-    // Contexte de la recherche
-    const proCount = searchResults.length;
-    let proContext = '';
-    
-    if (proCount > 0) {
-        // Crée un contexte détaillé pour les 3 meilleurs résultats
-        const topPros = searchResults.slice(0, 3).map((pro, index) => 
-            `\n${index + 1}. ${pro.nom_entreprise} - Activité: ${pro.activite} - Détails: ${pro.activite_detaillee} - Ville: ${pro.ville}, ${pro.quartier} - Note: ${pro.note_avis} - Contact: ${pro.contact_whatsapp || pro.contact_telephone || 'Non public'}`
-        ).join('');
-
-        proContext = `J'ai trouvé ${proCount} professionnel(s) correspondant(s) à la requête. Les meilleurs résultats sont:\n${topPros}\n---\n`;
-    } else {
-        proContext = `Je n'ai trouvé aucun professionnel dans mon annuaire pour cette requête.`;
-    }
-    
-    // Contexte général et instructions de rôle
-    systemInstruction = {
-        parts: [{ text: `
-            Vous êtes ProFinder AI, un assistant conversationnel pour l'annuaire de professionnels. 
-            Votre rôle est d'analyser la requête de l'utilisateur.
-
-            -- Règles de Réponse --
-            1. Si des professionnels ont été trouvés (voir CONTEXTE), vous devez:
-               - Confirmer la recherche et mentionner le nombre de résultats trouvés.
-               - Inviter l'utilisateur à parcourir la liste affichée ci-dessous.
-               - NE PAS répéter les détails de contact ou d'activité des professionnels. Dites simplement: "Tous les détails sont affichés dans les cartes ci-dessous."
-               - Suggérer une nouvelle recherche plus précise.
-            2. Si AUCUN professionnel n'a été trouvé (voir CONTEXTE), vous devez:
-               - Expliquer poliment qu'aucun résultat interne n'a été trouvé.
-               - Lancer une recherche Google pour tenter de répondre à la question de manière générale (Utilisez l'outil Google Search).
-               - Si Google Search fournit des informations pertinentes, résumez-les en français.
-            3. Si la requête est une question générale (non liée à la recherche d'un pro) ou nécessite des informations actualisées (ex: "Quel est le taux de change du jour ?"), utilisez l'outil Google Search.
-            4. Votre ton est professionnel, amical et précis.
-            5. Utilisez toujours le français.
-            
-            CONTEXTE ACTUEL (Annuaire Interne):
-            ${proContext}
-            ` 
-        }]
-    };
-    
-    // La requête utilisateur envoyée à Gemini
-    prompt = `Requête de l'utilisateur: "${rawQuery}"`;
-
-    let responseText = "🤖 *ProFinder AI est en ligne...*";
-    appendMessage(responseText, 'ai');
-    
-    // Création de l'élément de message de l'AI pour le mettre à jour plus tard
-    const aiMessageElement = chatBox.lastElementChild.querySelector('.message-bubble');
-
+async function fetchAndProcessSheetData() {
     try {
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            // Active Google Search grounding si nécessaire (pour les questions générales ou l'absence de résultats internes)
-            tools: [{ "google_search": {} }], 
-            systemInstruction: systemInstruction,
-        };
+        const response = await fetch(SHEET_API_URL);
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+        }
         
-        const apiResponse = await callGeminiApi(payload);
+        const text = await response.text();
+        // Le format gviz/tq est enveloppé dans `google.visualization.Query.setResponse(...)`
+        const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+        const data = JSON.parse(jsonText);
         
-        const candidate = apiResponse.candidates?.[0];
-        responseText = candidate?.content?.parts?.[0]?.text || "Désolé, je n'ai pas pu générer de réponse pour le moment.";
-
-        // Remplacement par la réponse finale
-        aiMessageElement.innerHTML = responseText;
+        if (data.status === 'ok' && data.table) {
+            proData = transformSheetData(data.table);
+            console.log(`✅ ${proData.length} professionnels chargés.`);
+            // Affiche un message si l'utilisateur est déjà sur la page du chat
+            if (window.location.hash === '#chat') {
+                 // S'assurer que le premier message d'accueil n'est pas remplacé
+                if (chatBox.children.length === 1 && chatBox.children[0].textContent.includes("Bonjour")) {
+                    // C'est le message initial, on ne fait rien
+                } else {
+                    appendMessage("✅ Les données de l'annuaire sont chargées, je suis prêt à chercher !", 'ai');
+                }
+            }
+        } else {
+            throw new Error(data.errors ? data.errors[0].message : 'Format de données inattendu.');
+        }
 
     } catch (error) {
-        console.error("Erreur Gemini AI:", error);
-        aiMessageElement.innerHTML = `❌ *Erreur de communication avec l'IA. Veuillez réessayer.*`;
+        console.error("❌ Erreur de chargement des données de Google Sheet. Vérifiez le SHEET_API_URL et l'accès public:", error);
+        appendMessage("❌ Erreur critique : Impossible de charger les données des professionnels. Vérifiez la console pour plus de détails.", 'ai');
     }
 }
 
+/**
+ * Transforme les données brutes gviz/tq en un tableau d'objets faciles à manipuler.
+ * @param {Object} table L'objet table de la réponse gviz/tq.
+ * @returns {Array<Object>} Tableau d'objets professionnels.
+ */
+function transformSheetData(table) {
+    const headers = table.cols.map(col => col.label || col.id);
+    const data = [];
+    table.rows.forEach(row => {
+        const pro = {};
+        row.c.forEach((cell, index) => {
+            const header = headers[index];
+            // Utiliser v pour la valeur formatée (comme '1.23' pour les notes) ou la valeur brute
+            pro[header] = cell ? (cell.f || cell.v) : null;
+            
+            // Si c'est une cellule de type Date ou autre, elle peut nécessiter un traitement
+            if (header === 'Date/Heure d\'Inscription' && pro[header]) {
+                 pro[header] = new Date(pro[header]).toLocaleDateString('fr-FR');
+            }
+            
+            // Convertir explicitement Lat/Lng en nombres si possible
+            if (header === 'Latitude' || header === 'Longitude') {
+                pro[header] = parseFloat(pro[header]);
+            }
+        });
+        data.push(pro);
+    });
+    return data.filter(pro => pro['Activité']); // Filtre les lignes vides
+}
 
-// =====================================================================
-// FONCTIONS DE CHARGEMENT ET D'INITIALISATION
-// =====================================================================
 
 /**
- * Change l'affichage entre la page d'accueil et la page de chat.
- * @param {string} page - 'home' ou 'chat'.
+ * Analyse la requête utilisateur pour déterminer l'action et les paramètres de recherche.
+ * @param {string} query La requête de l'utilisateur.
+ * @returns {Object} { action: 'search'|'nearby', activity: string, location: string }
  */
-function navigateTo(page) {
-    if (page === 'chat') {
-        // CORRECTION APPLIQUÉE ICI : Utiliser d-none pour le basculement d'affichage
-        homePage.classList.add('d-none');
-        chatPage.classList.remove('d-none');
-        
-        // Ajoute un message initial seulement si la boîte est vide
-        if (chatBox.children.length === 0) {
-            appendMessage("Bonjour ! Je suis ProFinder AI. Cherchez-vous un professionnel dans un domaine particulier ou une information ? (Ex: 'plombier à Cotonou' ou 'taux de change')", 'ai');
-        }
+function parseQuery(query) {
+    const searchRegex = /je cherche un?e?\s+(.+?)\s+(à|au|en|sur|dans|de)\s+(.+)/i;
+    const nearbyRegex = /(proche|voisin|autour|le plus proche|la plus proche)\s*$/i;
+
+    // 1. Recherche de professionnel classique (Activité + Lieu)
+    const match = query.match(searchRegex);
+    if (match) {
+        const activity = match[1].trim();
+        const location = match[3].trim();
+        return { action: 'search', activity, location };
+    }
+
+    // 2. Recherche de proximité (Contient 'proche')
+    if (query.match(nearbyRegex)) {
+        // Tente d'extraire l'activité même avec 'le plus proche'
+        const activityMatch = query.replace(nearbyRegex, '').trim();
+        const activity = activityMatch.replace(/je cherche un?e?\s*/i, '').trim() || 'professionnel';
+        return { action: 'nearby', activity };
+    }
+    
+    // 3. Simple recherche d'activité (ex: 'Plombier')
+    const simpleActivityMatch = /je cherche un?e?\s+(.+)/i.exec(query);
+    if (simpleActivityMatch && simpleActivityMatch[1].trim().length > 2) {
+        return { action: 'search', activity: simpleActivityMatch[1].trim(), location: '' };
+    }
+
+
+    // 4. Par défaut (traitement direct ou non reconnu)
+    return { action: 'default', activity: query.trim() };
+}
+
+/**
+ * Traite la requête utilisateur et déclenche la recherche ou la géolocalisation.
+ * @param {string} query La requête de l'utilisateur.
+ */
+function processUserQuery(query) {
+    if (isAwaitingGeoResponse) {
+        // Cas où l'on attend une réponse OUI/NON pour la géolocalisation
+        handleGeoResponse(query);
+        isAwaitingGeoResponse = false;
+        return;
+    }
+    
+    appendMessage(query, 'user');
+    userInput.value = '';
+    proListContainer.innerHTML = '';
+    loadMoreBtn.classList.add('d-none');
+    
+    currentQuery = query;
+    const { action, activity, location } = parseQuery(query);
+    
+    switch (action) {
+        case 'search':
+            if (proData.length === 0) {
+                 appendMessage("🤖 Veuillez patienter, les données de l'annuaire ne sont pas encore chargées...", 'ai');
+                 return;
+            }
+            // Affichage d'un message de recherche en cours
+            appendMessage(`Recherche des ${activity} ${location ? `à ${location}` : 'dans l\'annuaire'}...`, 'ai');
+            searchProfessionals(activity, location);
+            break;
+            
+        case 'nearby':
+            // Demander l'autorisation de localisation
+            askForLocationPermission(activity);
+            break;
+            
+        case 'default':
+            appendMessage(`Je ne comprends pas bien votre requête. Pour la recherche, essayez : "Je cherche un **plombier** à **Paris**" ou "Je cherche l'activité **la plus proche**."`, 'ai');
+            break;
+    }
+}
+
+/**
+ * Effectue la recherche sur les données chargées en front-end (proData).
+ * @param {string} activity L'activité recherchée.
+ * @param {string} location Le lieu recherché (peut être vide).
+ */
+function searchProfessionals(activity, location) {
+    const activityLower = activity.toLowerCase();
+    const locationLower = location.toLowerCase();
+    let filteredPros = [];
+
+    // Fonctions de comparaison flexibles
+    const matchesActivity = (pro) => pro['Activité'] && pro['Activité'].toLowerCase().includes(activityLower);
+    const matchesLocation = (pro) => pro['Ville/Région'] && pro['Ville/Région'].toLowerCase().includes(locationLower);
+
+    // NIVEAU 1 : Activité ET Lieu
+    if (locationLower) {
+        filteredPros = proData.filter(pro => 
+            matchesActivity(pro) && matchesLocation(pro)
+        );
+    }
+    
+    // NIVEAU 2 : Si N1 échoue, chercher uniquement par Activité
+    if (filteredPros.length === 0) {
+        filteredPros = proData.filter(pro => matchesActivity(pro));
+    }
+    
+    // NIVEAU 3 : Si N2 échoue, chercher par Mots-clés dans la description
+    if (filteredPros.length === 0) {
+         filteredPros = proData.filter(pro => 
+            (pro['Description de l\'Activité'] && pro['Description de l\'Activité'].toLowerCase().includes(activityLower))
+        );
+    }
+
+    // Tri (par Note/Avis du meilleur au pire)
+    filteredPros.sort((a, b) => {
+        const noteA = parseFloat(a['Note/Avis']) || 0;
+        const noteB = parseFloat(b['Note/Avis']) || 0;
+        return noteB - noteA; 
+    });
+
+    if (filteredPros.length > 0) {
+        appendMessage(`🎉 J'ai trouvé ${filteredPros.length} professionnel(s) correspondant à votre recherche.`, 'ai');
+        displayProfessionals(filteredPros, true);
     } else {
-        // CORRECTION APPLIQUÉE ICI : Utiliser d-none pour le basculement d'affichage
-        chatPage.classList.add('d-none');
-        homePage.classList.remove('d-none');
+        appendMessage(`😔 Désolé, aucun résultat trouvé pour "${activity}" ${location ? `à "${location}"` : ''}. Essayez une requête plus générale !`, 'ai');
+    }
+}
+
+// =====================================================================
+// GÉOLOCALISATION
+// =====================================================================
+
+/**
+ * Demande de permission pour la géolocalisation dans un contexte conversationnel.
+ * @param {string} activity L'activité recherchée.
+ */
+function askForLocationPermission(activity) {
+    const message = `Pour vous trouver le/la ${activity} le/la plus proche, j'ai besoin d'accéder à votre position actuelle. Autorisez-vous cette opération ? (Répondez **OUI** ou **NON**)`;
+    appendMessage(message, 'ai');
+    currentQuery = activity; 
+    isAwaitingGeoResponse = true;
+}
+
+/**
+ * Gère la réponse OUI/NON de l'utilisateur à la demande de géolocalisation.
+ * @param {string} response La réponse de l'utilisateur.
+ */
+function handleGeoResponse(response) {
+    const respLower = response.toLowerCase();
+    if (respLower.includes('oui')) {
+        appendMessage('Parfait, je recherche votre position...', 'ai');
+        getUserLocation(currentQuery); // On passe l'activité recherchée
+    } else {
+        appendMessage('D\'accord. Sans votre position, je ne peux pas vous fournir le professionnel le plus proche. Vous pouvez relancer la recherche avec un lieu précis (ex: "plombier à Paris").', 'ai');
     }
 }
 
 /**
- * Tente d'obtenir la géolocalisation de l'utilisateur.
+ * Tente d'obtenir la localisation de l'utilisateur via le navigateur.
+ * @param {string} activity L'activité recherchée (utilisé après la réussite de la géo).
  */
-function getUserLocation() {
+function getUserLocation(activity = null) {
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
@@ -496,102 +396,94 @@ function getUserLocation() {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
-                console.log("Géolocalisation réussie:", userLocation);
-                // Le message de bienvenue peut être adapté ici si la localisation est connue
+                console.log("✅ Localisation utilisateur obtenue:", userLocation);
+                
+                if (activity) {
+                    findNearbyProfessionals(activity, userLocation);
+                }
             },
             (error) => {
-                console.warn("Erreur de géolocalisation:", error.message);
-                // Ne rien faire, la localisation est optionnelle
+                console.error("❌ Erreur de géolocalisation:", error);
+                if (activity) {
+                    appendMessage("❌ Impossible d'accéder à votre position. Veuillez vérifier les autorisations de votre navigateur et réessayer, ou effectuer une recherche par lieu.", 'ai');
+                }
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 0
-            }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
         );
     } else {
-        console.warn("La géolocalisation n'est pas supportée par ce navigateur.");
+        appendMessage("Votre navigateur ne supporte pas la géolocalisation.", 'ai');
     }
+}
+
+/**
+ * Calcule la distance entre deux points géographiques (formule de Haversine).
+ * @param {number} lat1 Latitude 1
+ * @param {number} lon1 Longitude 1
+ * @param {number} lat2 Latitude 2
+ * @param {number} lon2 Longitude 2
+ * @returns {number} Distance en kilomètres.
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; 
 }
 
 
 /**
- * Charge les données des professionnels depuis Google Sheets.
+ * Trouve les professionnels les plus proches pour une activité donnée et propose le lien Maps.
+ * @param {string} activity L'activité recherchée.
+ * @param {Object} location La position de l'utilisateur {lat, lng}.
  */
-async function loadProfessionalData() {
-    console.log("Chargement des données...");
-    try {
-        const response = await fetch(SHEET_API_URL);
-        const text = await response.text();
+function findNearbyProfessionals(activity, location) {
+    const activityLower = activity.toLowerCase();
+    
+    // 1. Filtrer par activité et s'assurer qu'ils ont des coordonnées
+    let nearbyPros = proData.filter(pro => 
+        pro['Activité'] && pro['Activité'].toLowerCase().includes(activityLower) && 
+        pro.Latitude && pro.Longitude
+    );
+    
+    // 2. Calculer la distance
+    nearbyPros.forEach(pro => {
+        pro.distance = calculateDistance(location.lat, location.lng, pro.Latitude, pro.Longitude);
+    });
+
+    // 3. Trier par distance
+    nearbyPros.sort((a, b) => a.distance - b.distance);
+    
+    const maxResults = 5;
+    const topPros = nearbyPros.slice(0, maxResults);
+
+    if (topPros.length > 0) {
+        // Construction de la chaîne de recherche pour Google Maps
+        // Format: 'Activité 1 + Activité 2 + ... + Actvité N' à partir de la position utilisateur
+        const queryList = topPros.map(p => p['Activité']).join(' + ');
+        const mapsLink = `${MAPS_BASE_URL}${queryList}&query_place_id=&query=${location.lat},${location.lng}`;
+
+        appendMessage(`J'ai trouvé ${topPros.length} ${activity}s à proximité, dont le plus proche est à environ **${topPros[0].distance.toFixed(2)} km** (${topPros[0]['Nom/Prénom']}).`, 'ai');
         
-        // La réponse Gviz est un wrapper JavaScript, il faut l'extraire
-        const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
-        const data = JSON.parse(jsonText);
-
-        const rows = data.table.rows;
-        const cols = data.table.cols;
+        // Afficher la carte et les résultats principaux
+        displayProfessionals(topPros, true); 
         
-        // Récupérer les noms de colonnes du premier row (l'en-tête)
-        // Les noms des colonnes sont dans la propriété 'label'
-        const columnLabels = cols.map(c => c.label);
+        // Afficher le lien Google Maps
+        const mapLinkHtml = `
+            <div class="mt-3 p-3 rounded-lg shadow-lg" style="background-color: var(--input-bg);">
+                <p class="mb-2">Cliquez ici pour visualiser tous les résultats proches directement sur Google Maps :</p>
+                <a href="${mapsLink}" target="_blank" class="whatsapp-link" style="color: var(--accent-color);">
+                    <i class="bi bi-map-fill me-2"></i> Voir les ${activity}s les plus proches sur Maps
+                </a>
+            </div>
+        `;
+        appendMessage(mapLinkHtml, 'ai');
 
-        // Transformation des données
-        proData = rows.map(row => {
-            let pro = {};
-            row.c.forEach((cell, index) => {
-                const label = columnLabels[index];
-                let value = cell ? (cell.v !== undefined ? cell.v : cell.f) : null;
-                
-                // Normalisation des clés pour la recherche
-                const keyMapping = {
-                    'Timestamp': 'timestamp',
-                    'Nom de l\'Entreprise': 'nom_entreprise',
-                    'Contact WhatsApp': 'contact_whatsapp',
-                    'Contact Téléphonique': 'contact_telephone',
-                    'Ville de Base': 'ville',
-                    'Quartier / Localisation': 'quartier',
-                    'Indication GPS': 'indication_gps',
-                    'Secteur Général': 'secteur',
-                    'Activité Détaillée': 'activite_detaillee',
-                    'Expérience (ans)': 'experience_ans',
-                    'Prix Min (FCFA)': 'prix_min',
-                    'Prix Max (FCFA)': 'prix_max',
-                    'Note/Avis': 'note_avis',
-                    'Vérification (Oui/Non)': 'verification',
-                    'Consentement Contact': 'contact_consent',
-                    // Ajouter le mapping si le nom de l'activité est séparé
-                    // On utilise 'activite_detaillee' comme 'activite' principale pour la recherche
-                    // Ajout d'une clé simple 'activite' pour la recherche rapide
-                    'Activité Principale': 'activite' 
-                };
-
-                const key = keyMapping[label] || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)/g, '');
-
-                // Conversion de type pour les nombres
-                if (key === 'note_avis' || key === 'experience_ans') {
-                    value = parseFloat(value) || 0;
-                }
-                
-                // Le nom de l'activité principale est l'activité détaillée (pour l'instant)
-                if (key === 'activite_detaillee' && !pro.activite) {
-                    pro.activite = value;
-                }
-                
-                pro[key] = value;
-            });
-            // Assure que l'activité principale est définie pour la recherche si elle ne l'est pas
-            if (!pro.activite) {
-                pro.activite = pro.activite_detaillee;
-            }
-            return pro;
-        }).filter(pro => pro.nom_entreprise); // Filtre les lignes vides
-        
-        console.log(`Données chargées : ${proData.length} professionnels.`);
-        // Note: La première recherche n'est déclenchée que lorsque l'utilisateur tape quelque chose.
-
-    } catch (error) {
-        console.error("Erreur lors du chargement des données de Google Sheet. Vérifiez le SHEET_API_URL et l'accès public:", error);
-        appendMessage("❌ Erreur critique : Impossible de charger les données des professionnels. Veuillez vérifier la console pour plus de détails.", 'ai');
+    } else {
+        appendMessage(`😔 Désolé, je n'ai trouvé aucun ${activity} avec des coordonnées valides à proximité.`, 'ai');
     }
 }
 
@@ -602,8 +494,12 @@ async function loadProfessionalData() {
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Initialisation
-    loadProfessionalData();
-    getUserLocation();
+    // NOTE: On ne fait plus de loadProfessionalData() au démarrage pour ne pas spammer
+    // l'API. La fonction `fetchAndProcessSheetData()` est appelée ici à la place.
+    fetchAndProcessSheetData(); 
+    
+    // On appelle getUserLocation() pour pré-remplir la variable si l'utilisateur l'autorise
+    getUserLocation(); 
     
     // 2. Gestion des Boutons
     startChatBtn.addEventListener('click', () => {
@@ -623,6 +519,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     userInput.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
+            e.preventDefault(); // Empêche le saut de ligne par défaut
             sendBtn.click();
         }
     });
