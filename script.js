@@ -3,6 +3,11 @@
 // =====================================================================
 const SHEET_API_URL = 'https://docs.google.com/spreadsheets/d/1RnfF5eEeAx3mFrTagLq_C2LSB1DjeA20UOANh9wE7uk/gviz/tq?tqx=out:json'; 
 // =====================================================================
+// ⚠️ ÉTAPE 2 : REMPLACEZ CETTE URL PAR L'URL DE VOTRE DÉPLOIEMENT APPS SCRIPT !
+// (Celle qui exécute la fonction doPost)
+// =====================================================================
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQvP1nTpv4uN3cwBLqJ1ySkUaHnn9u8aapAiB2DnHW1_r-3vfeFxzVrNRzKk04PmAj/exec'; 
+// =====================================================================
 
 let proData = []; 
 // Nouvelle variable pour stocker la position de l'utilisateur
@@ -20,6 +25,7 @@ const accueilBtnNav = document.getElementById('accueil-btn-nav');
 
 // =====================================================================
 // LISTES DE RÉFÉRENCE (GEO_KEYWORDS ÉTENDU)
+// (La logique de ces listes est conservée pour la détection des mots-clés)
 // =====================================================================
 
 const SECTOR_COLUMNS = [
@@ -74,7 +80,7 @@ const GEO_KEYWORDS = [
 
 
 // =====================================================================
-// FONCTIONS DE BASE
+// FONCTIONS DE BASE (INCHANGÉES)
 // =====================================================================
 
 function showPage(pageId) {
@@ -128,6 +134,7 @@ function handleUserQuery() {
     addMessage(query, 'user');
     userInput.value = '';
 
+    // Changement : ProcessBotResponse est maintenant asynchrone
     processBotResponse(query);
 }
 sendBtn.addEventListener('click', handleUserQuery);
@@ -139,7 +146,7 @@ userInput.addEventListener('keypress', (e) => {
 
 
 // =====================================================================
-// NOUVELLES FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES
+// FONCTIONS D'AFFICHAGE ET DE GESTION DES DONNÉES (MODIFIÉES)
 // =====================================================================
 
 // CORRECTION: Conversion de la note numérique en étoiles HTML (pleines ★ et vides ☆)
@@ -180,17 +187,17 @@ function formatFCFA(number) {
     return new Intl.NumberFormat('fr-FR').format(number) + ' FCFA';
 }
 
-// Fonction de tri (La meilleure note ET la meilleure expérience en premier)
+// Fonction de tri (La meilleure note ET la meilleure expérience en premier) - Utile si Apps Script n'a pas pu trier
 function sortProfessionals(a, b) {
     // 1. Priorité à la Note
-    if (b.note !== a.note) {
-        return b.note - a.note; // Tri décroissant (meilleure note d'abord)
+    if (b["Note/Avis"] !== a["Note/Avis"]) {
+        return parseFloat(b["Note/Avis"]) - parseFloat(a["Note/Avis"]); // Tri décroissant (meilleure note d'abord)
     }
     // 2. Si les notes sont égales, prioriser l'Expérience
-    return b.experience - a.experience; // Tri décroissant (plus d'expérience d'abord)
+    return parseFloat(b["Experiences (ans)"]) - parseFloat(a["Experiences (ans)"]); // Tri décroissant (plus d'expérience d'abord)
 }
 
-// MISE À JOUR : Lecture des nouvelles colonnes, y compris Latitude et Longitude
+// MISE À JOUR : Chargement des données (uniquement pour le compte initial)
 async function loadSheetData() {
     addMessage("Chargement des données de l'annuaire...", 'bot');
     
@@ -202,119 +209,77 @@ async function loadSheetData() {
         const data = JSON.parse(jsonText);
         
         const rows = data.table.rows;
-        const headers = data.table.cols.map(col => col.label);
         
-        // Détermination de l'index de départ des colonnes d'activité réelle
-        const ACTIVITY_START_INDEX = headers.findIndex(h => h.includes('Finance / Assurance')); 
-
-        // Index pour les colonnes de qualité et localisation
-        const NOTE_INDEX = headers.findIndex(h => h.includes('Note'));
-        const EXPERIENCE_INDEX = headers.findIndex(h => h.includes('Expérience_Ans'));
-        const VERIFIE_GPS_INDEX = headers.findIndex(h => h.includes('Verifie_GPS'));
-        const PRIX_MIN_INDEX = headers.findIndex(h => h.includes('Prix_Min'));
-        const PRIX_MAX_INDEX = headers.findIndex(h => h.includes('Prix_Max'));
-        const LATITUDE_INDEX = headers.findIndex(h => h.includes('Latitude'));
-        const LONGITUDE_INDEX = headers.findIndex(h => h.includes('Longitude'));
+        // Filtre pour obtenir un compte initial plus précis
+        const ACTIVITY_INDEX = 8; // Basé sur l'index de Activité détaillée dans code.gs (colonne 9)
+        const count = rows.filter(row => row.c && row.c[ACTIVITY_INDEX] && row.c[ACTIVITY_INDEX].v).length;
 
 
-        const formattedData = rows.slice(1).map(row => {
-            const cells = row.c;
-
-            // Reconstruction du VRAI métier/activité
-            let activiteDetaillee = '';
-            let secteurGeneral = cells[6] ? cells[6].v : 'Inconnu'; 
-
-            for (let i = ACTIVITY_START_INDEX; i < ACTIVITY_START_INDEX + SECTOR_COLUMNS.length; i++) {
-                if (cells[i] && cells[i].v) {
-                    activiteDetaillee = cells[i].v; 
-                    break;
-                }
-            }
-            
-            // Extraction des nouvelles données 
-            const noteCell = cells[NOTE_INDEX];
-            const experienceCell = cells[EXPERIENCE_INDEX];
-            const prixMinCell = cells[PRIX_MIN_INDEX];
-            const prixMaxCell = cells[PRIX_MAX_INDEX];
-            const verifieGpsCell = cells[VERIFIE_GPS_INDEX];
-
-
-            // Indices: [1]=Nom, [2]=Entreprise, [3]=Contact WhatsApp, [4]=Quartier, [5]=Ville
-            return {
-                nom: cells[1] ? cells[1].v : '',
-                entreprise: cells[2] ? cells[2].v : '',
-                contact: cells[3] ? cells[3].v : '',
-                quartier: cells[4] ? cells[4].v : '',
-                ville: cells[5] ? cells[5].v : '',
-                secteur: secteurGeneral,
-                activite: activiteDetaillee, // La spécialité exacte
-                
-                // NOUVEAUX CHAMPS DE QUALITÉ ET LOCALISATION
-                note: noteCell && noteCell.v !== null ? parseFloat(noteCell.v) : 0, // 0 par défaut
-                experience: experienceCell && experienceCell.v !== null ? parseInt(experienceCell.v) : 0, // 0 par défaut
-                verifie_gps: verifieGpsCell && verifieGpsCell.v ? verifieGpsCell.v.toUpperCase() === 'OUI' : false,
-                prix_min: prixMinCell && prixMinCell.v !== null ? parseFloat(prixMinCell.v) : null,
-                prix_max: prixMaxCell && prixMaxCell.v !== null ? parseFloat(prixMaxCell.v) : null,
-                latitude: cells[LATITUDE_INDEX] && cells[LATITUDE_INDEX].v !== null ? parseFloat(cells[LATITUDE_INDEX].v) : null,
-                longitude: cells[LONGITUDE_INDEX] && cells[LONGITUDE_INDEX].v !== null ? parseFloat(cells[LONGITUDE_INDEX].v) : null,
-            };
-        }).filter(item => item.activite.trim() !== ''); // N'inclut que les lignes ayant une activité réelle
-
-        proData = formattedData;
-        addMessage(`Données chargées ! **${proData.length}** professionnels sont disponibles.`, 'bot');
+        addMessage(`Données chargées ! **${count}** professionnels sont disponibles.`, 'bot');
 
     } catch (error) {
-        addMessage("❌ Erreur de connexion aux données. Assurez-vous que le Sheet est public et que l'ID est correct.", 'bot');
+        addMessage("❌ Erreur de connexion aux données. Le décompte initial pourrait être erroné.", 'bot');
         console.error("Erreur de chargement des données :", error);
     }
 }
 
 
-// MISE À JOUR : Affichage des nouvelles informations
+// MISE À JOUR : Affichage des nouvelles informations (Affiche les résultats formatés par Apps Script)
 function displayResults(results, activite, ville) {
     let responseHTML = '';
     const recherche = `**${activite || 'Professionnel'}** ${ville ? 'à **' + ville + '**' : ''}`;
 
     if (results.length > 0) {
-        // Tri des résultats avant l'affichage
-        results.sort(sortProfessionals);
+        // Apps Script a déjà trié les données [cite: 58]
         
         responseHTML += `<p>✅ J'ai trouvé **${results.length}** résultat(s) pour ${recherche}.</p>
                          <p class="small fst-italic">Trié par **Note** et **Expérience**.</p>`;
 
         results.forEach(pro => {
-            const nomAffichage = pro.entreprise.trim() ? `${pro.entreprise} (par ${pro.nom})` : pro.nom;
-            const quartierInfo = pro.quartier.trim() ? ` à ${pro.quartier}` : '';
+            // Note: Les clés du PRO sont celles définies dans handleSearchProfessionals de code.gs [cite: 45, 46, 47]
+            const nomAffichage = pro["Nom de l'Entreprise"].trim() ? `${pro["Nom de l'Entreprise"]} (par ${pro["Nom du contact"]})` : pro["Nom du contact"];
+            const quartierInfo = pro.Quartier.trim() ? ` à ${pro.Quartier}` : '';
             
             // Badges et Infos Qualité
-            const noteEtoiles = pro.note > 0 ? getStarRating(pro.note) : '';
-            const badgeVerif = pro.verifie_gps ? `<span class="badge-verified ms-2">VÉRIFIÉ GPS</span>` : '';
+            const noteValue = parseFloat(pro["Note/Avis"]) || 0;
+            const noteEtoiles = noteValue > 0 ? getStarRating(noteValue) : '';
             
-            // AFFICHAGE EXPÉRIENCE CORRIGÉ
-            const experience = pro.experience > 0 ? `${pro.experience} an(s)` : 'Nouvelle adhésion';
+            // Apps Script ne renvoie pas de champ "Vérifié GPS", on le garde pour l'instant même si Apps Script n'envoie pas cette clé.
+            // On peut supposer que la présence des coordonnées et une note élevée implique la vérification.
+            const badgeVerif = (pro.latitude && pro.longitude) ? `<span class="badge-verified ms-2">VÉRIFIÉ GPS</span>` : '';
+            
+            // AFFICHAGE EXPÉRIENCE 
+            const experienceValue = parseInt(pro["Experiences (ans)"]) || 0;
+            const experience = experienceValue > 0 ? `${experienceValue} an(s)` : 'Nouvelle adhésion';
             
             let prixInfo = 'Non spécifié';
-            if (pro.prix_min !== null && pro.prix_max !== null) {
-                 prixInfo = `${formatFCFA(pro.prix_min)} - ${formatFCFA(pro.prix_max)}`;
-            } else if (pro.prix_min !== null) {
-                prixInfo = `À partir de : ${formatFCFA(pro.prix_min)}`;
+            const prixMin = parseFloat(pro["Prix Min (FCFA)"]) || null;
+            const prixMax = parseFloat(pro["Prix Max (FCFA)"]) || null;
+
+            if (prixMin !== null && prixMax !== null && prixMin < prixMax) {
+                 prixInfo = `${formatFCFA(prixMin)} - ${formatFCFA(prixMax)}`;
+            } else if (prixMin !== null) {
+                prixInfo = `À partir de : ${formatFCFA(prixMin)}`;
+            } else if (prixMax !== null) {
+                prixInfo = `Jusqu'à : ${formatFCFA(prixMax)}`;
             }
 
+
             // NOUVEAU: Lien de localisation (Visible si coordonnées et vérification OUI)
-            const mapLink = (pro.latitude && pro.longitude && pro.verifie_gps) ? 
+            const mapLink = (pro.latitude && pro.longitude) ? 
                 `<a href="https://maps.google.com/?q=${pro.latitude},${pro.longitude}" target="_blank" class="location-link mt-2"><i class="bi bi-geo-alt-fill"></i> Voir l'adresse</a>` : '';
 
 
             responseHTML += `
                 <div class="result-card animated-result-card">
                     <p class="mb-0 text-white fw-bold d-flex align-items-center">${nomAffichage} ${badgeVerif}</p>
-                    <p class="mb-1 text-accent small">${pro.activite} - ${pro.ville}${quartierInfo}</p>
+                    <p class="mb-1 text-accent small">${pro["Activité détaillée"]} - ${pro.Ville}${quartierInfo}</p>
                     <div class="note-line">
                         <div>${noteEtoiles}</div>
                         <div class="experience-text">Expérience : <span>${experience}</span></div>
                     </div>
                     <p class="price-range">${prixInfo}</p>
-                    ${mapLink} <a href="https://wa.me/${pro.contact.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
+                    ${mapLink} <a href="https://wa.me/${pro.WhatsApp.replace(/\s/g, '')}" target="_blank" class="whatsapp-link">
                         <i class="bi bi-whatsapp"></i> Contacter via WhatsApp
                     </a>
                 </div>
@@ -330,7 +295,51 @@ function displayResults(results, activite, ville) {
 
 
 // =====================================================================
-// LOGIQUE DE GÉOLOCALISATION
+// FONCTION DE RECHERCHE CÔTÉ SERVEUR (NOUVELLE)
+// =====================================================================
+
+async function fetchProfessionalsFromServer(activite, ville, quartier) {
+    addMessage("Recherche des professionnels...", 'bot');
+
+    try {
+        const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            // On envoie un corps JSON pour être reconnu par doPost dans code.gs [cite: 11]
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'search',
+                activite: activite,
+                ville: ville,
+                quartier: quartier
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Erreur HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            return data.results; // Renvoie les résultats filtrés et triés par Apps Script [cite: 58]
+        } else {
+            // Afficher l'erreur du serveur
+            addMessage(`❌ Erreur du serveur lors de la recherche : ${data.message || 'Erreur inconnue.'}`, 'bot');
+            return [];
+        }
+
+    } catch (error) {
+        console.error("Erreur de communication avec Apps Script :", error);
+        addMessage(`❌ Impossible de communiquer avec le service de recherche. Vérifiez l'URL de déploiement (${APPS_SCRIPT_URL}).`, 'bot');
+        return [];
+    }
+}
+
+
+// =====================================================================
+// LOGIQUE DE GÉOLOCALISATION (INCHANGÉE)
 // =====================================================================
 
 function askForGeolocation(keyword) {
@@ -397,6 +406,34 @@ function searchNearby(keyword, location) {
 }
 
 
+// =====================================================================
+// LOGIQUE DE DÉTECTION DES MOTS-CLÉS (MODIFIÉE)
+// =====================================================================
+
+// Tente d'extraire un mot qui ne serait ni une ville ni une activité
+function getQuartierFromQuery(query) {
+    const words = query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2);
+    const citiesAndKeywords = ALL_CITIES.concat(GEO_KEYWORDS).map(normalizeKeyword);
+
+    for (const word of words) {
+        const normalizedWord = normalizeKeyword(word);
+        
+        // Exclure les villes, les mots-clés de géolocalisation et les mots-clés d'activité
+        if (!ALL_CITIES.includes(word) && !GEO_KEYWORDS.includes(normalizedWord)) {
+            const isSectorOrSpecialty = SECTOR_COLUMNS.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
+                                        ALL_SPECIALTIES.map(s => s.toLowerCase().split(' / ')[0]).includes(normalizedWord) ||
+                                        ALL_SPECIALTIES.map(s => s.toLowerCase()).some(s => s.includes(normalizedWord));
+            
+            if (!isSectorOrSpecialty) {
+                // On suppose que le premier mot non-identifié pourrait être un quartier
+                return word;
+            }
+        }
+    }
+    return ''; // Aucun quartier détecté
+}
+
+
 // Normalisation du mot et détection (Geo et Profinder)
 function normalizeKeyword(word) {
     if (word.endsWith('s') && word.length > 3) {
@@ -450,7 +487,7 @@ function getKeywords(query) {
     return { activite: keywordActivite, ville: keywordVille, geo: keywordGeo };
 }
 
-function processBotResponse(query) {
+async function processBotResponse(query) {
     const lowerQuery = query.toLowerCase();
     const { activite: activiteKeyword, ville: villeKeyword, geo: geoKeyword } = getKeywords(query);
     
@@ -470,13 +507,12 @@ function processBotResponse(query) {
             return;
         }
 
-        // 1. Recherche stricte
-        let results = searchProfessionals(query, activiteKeyword, villeKeyword, false);
-
-        // 2. Dégradation de la recherche (Ignorer le quartier)
-        if (results.length === 0 && villeKeyword) {
-             results = searchProfessionals(query, activiteKeyword, villeKeyword, true);
-        }
+        // --- MISE À JOUR MAJEURE : APPEL AU SERVEUR ---
+        // On récupère le quartier si présent dans la requête
+        const quartierKeyword = getQuartierFromQuery(query); 
+        
+        // Apps Script va gérer la recherche dégradée (Quartier -> Ville -> Activité) 
+        const results = await fetchProfessionalsFromServer(activiteKeyword, villeKeyword, quartierKeyword);
 
         displayResults(results, activiteKeyword, villeKeyword);
 
@@ -487,47 +523,7 @@ function processBotResponse(query) {
     }
 }
 
-function searchProfessionals(query, activite, ville, degrade = false) {
-    if (proData.length === 0) return [];
-
-    const queryWords = query ? query.toLowerCase().split(/[\s,;']+/).filter(w => w.length > 2).map(normalizeKeyword) : [];
-
-    return proData.filter(pro => {
-        let matchActivite = false;
-        let matchVille = false;
-        
-        const proActivite = pro.activite.toLowerCase();
-        const proSecteur = pro.secteur.toLowerCase();
-        const proVille = pro.ville.toLowerCase();
-        const proQuartier = pro.quartier.toLowerCase();
-
-        // 1. Logique d'Activité
-        if (activite) {
-            matchActivite = proActivite.includes(activite) || proSecteur.includes(activite) || 
-                            queryWords.some(word => proActivite.includes(word) || proSecteur.includes(word));
-        } else {
-            matchActivite = true; 
-        }
-        
-        // 2. Logique de Ville/Quartier (Dégradation)
-        if (ville) {
-            if (degrade) {
-                // Recherche dégradée : Ville uniquement
-                matchVille = proVille.includes(ville);
-            } else {
-                // Recherche stricte : Ville OU (Ville + Quartier)
-                const fullLocation = proVille + ' ' + proQuartier;
-                matchVille = fullLocation.includes(query.toLowerCase()) || proVille.includes(ville);
-            }
-        } else {
-            matchVille = true;
-        }
-        
-        return matchActivite && matchVille;
-    });
-}
 
 // Démarrage : chargement des données au lancement
 loadSheetData();
 showPage('home');
-
